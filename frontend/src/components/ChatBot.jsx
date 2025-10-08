@@ -4,14 +4,19 @@ const ChatBot = ({ onClose }) => {
   const [messages, setMessages] = useState([
     {
       id: 1,
-      text: "Hi! I'm your AI Financial Assistant. How can I help you manage your finances today?",
+      text: "Hi! I'm your AI Financial Assistant. I can help you analyze expenses, track budgets, monitor investments, and achieve your financial goals. How can I help you today?",
       sender: "bot",
       timestamp: new Date(),
     },
   ]);
   const [inputMessage, setInputMessage] = useState("");
   const [isTyping, setIsTyping] = useState(false);
+  const [sessionId, setSessionId] = useState(null);
+  const [isConnected, setIsConnected] = useState(false);
   const messagesEndRef = useRef(null);
+
+  // API configuration
+  const API_BASE_URL = "http://localhost:8001/api/v1";
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -20,6 +25,23 @@ const ChatBot = ({ onClose }) => {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Check API connection on component mount
+  useEffect(() => {
+    checkApiConnection();
+  }, []);
+
+  const checkApiConnection = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/health`);
+      if (response.ok) {
+        setIsConnected(true);
+      }
+    } catch (error) {
+      console.error("API connection failed:", error);
+      setIsConnected(false);
+    }
+  };
 
   const handleSendMessage = async (e) => {
     e.preventDefault();
@@ -37,42 +59,166 @@ const ChatBot = ({ onClose }) => {
     setInputMessage("");
     setIsTyping(true);
 
-    // Simulate AI response
-    setTimeout(() => {
-      const responses = [
-        "Based on your spending patterns, I recommend setting aside 20% of your income for savings. Would you like me to create a budget plan for you?",
-        "I see you're interested in investments. Your risk profile suggests a balanced portfolio with 60% stocks and 40% bonds. Shall I show you some options?",
-        "Great question! For emergency funds, aim for 3-6 months of expenses. Based on your current spending, that would be around $15,000-$30,000.",
-        "I can help you track that expense. What category would you like to assign it to? I suggest 'Entertainment' or 'Dining Out'.",
-        "Your debt-to-income ratio is looking good at 25%. To improve it further, consider paying extra on your highest interest debt first.",
-        "I notice you have some recurring subscriptions. Would you like me to analyze which ones you might want to cancel to save money?",
-      ];
+    try {
+      // Call the finance agent API
+      const response = await fetch(`${API_BASE_URL}/chat`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          query: inputMessage,
+          session_id: sessionId,
+        }),
+      });
 
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      // Update session ID if not set
+      if (!sessionId) {
+        setSessionId(data.session_id);
+      }
+
+      // Create bot response message
       const botResponse = {
-        id: Date.now(),
-        text: responses[Math.floor(Math.random() * responses.length)],
+        id: Date.now() + 1,
+        text: data.response,
         sender: "bot",
         timestamp: new Date(),
+        intent: data.intent,
+        tools_used: data.tools_used,
+        analysis_results: data.analysis_results,
       };
 
       setMessages((prev) => [...prev, botResponse]);
       setIsTyping(false);
-    }, 1500);
+    } catch (error) {
+      console.error("Error sending message:", error);
+
+      // Fallback error message
+      const errorMessage = {
+        id: Date.now() + 1,
+        text: isConnected
+          ? "I'm sorry, I encountered an error processing your request. Please try again."
+          : "I'm having trouble connecting to the finance agent. Please make sure the backend server is running on http://localhost:8000",
+        sender: "bot",
+        timestamp: new Date(),
+        isError: true,
+      };
+
+      setMessages((prev) => [...prev, errorMessage]);
+      setIsTyping(false);
+    }
   };
 
   const quickActions = [
-    "Check my budget",
-    "Investment advice",
-    "Expense analysis",
-    "Set savings goal",
+    "How much did I spend on food this month?",
+    "Am I over budget?",
+    "How are my investments performing?",
+    "How close am I to my emergency fund goal?",
+    "Give me a financial summary",
+    "Show me my spending by category",
   ];
 
   const handleQuickAction = (action) => {
     setInputMessage(action);
   };
 
+  const clearSession = async () => {
+    if (sessionId) {
+      try {
+        await fetch(`${API_BASE_URL}/session/${sessionId}`, {
+          method: "DELETE",
+        });
+      } catch (error) {
+        console.error("Error clearing session:", error);
+      }
+    }
+
+    setMessages([
+      {
+        id: 1,
+        text: "Hi! I'm your AI Financial Assistant powered by LangGraph. I can help you analyze expenses, track budgets, monitor investments, and achieve your financial goals. How can I help you today?",
+        sender: "bot",
+        timestamp: new Date(),
+      },
+    ]);
+    setSessionId(null);
+  };
+
+  const renderMessage = (message) => {
+    const isBot = message.sender === "bot";
+    const hasAnalysis =
+      message.analysis_results &&
+      Object.keys(message.analysis_results).length > 0;
+
+    return (
+      <div
+        key={message.id}
+        className={`flex ${isBot ? "justify-start" : "justify-end"}`}
+      >
+        <div
+          className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+            isBot
+              ? message.isError
+                ? "bg-red-100 text-red-800 border border-red-200"
+                : "bg-gray-100 text-gray-800"
+              : "bg-sky-600 text-white"
+          }`}
+        >
+          <p className="text-sm whitespace-pre-wrap">{message.text}</p>
+
+          {/* Show intent and tools used for bot messages */}
+          {isBot && message.intent && !message.isError && (
+            <div className="mt-2 pt-2 border-t border-gray-200">
+              <p className="text-xs text-gray-500">
+                Intent: <span className="font-medium">{message.intent}</span>
+              </p>
+              {message.tools_used && message.tools_used.length > 0 && (
+                <p className="text-xs text-gray-500">
+                  Tools:{" "}
+                  <span className="font-medium">
+                    {message.tools_used.join(", ")}
+                  </span>
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Analysis results indicator */}
+          {hasAnalysis && (
+            <div className="mt-2 pt-2 border-t border-gray-200">
+              <p className="text-xs text-gray-500">
+                📊 Analysis: {Object.keys(message.analysis_results).join(", ")}
+              </p>
+            </div>
+          )}
+
+          <p
+            className={`text-xs mt-1 ${
+              isBot
+                ? message.isError
+                  ? "text-red-500"
+                  : "text-gray-500"
+                : "text-sky-100"
+            }`}
+          >
+            {message.timestamp.toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+          </p>
+        </div>
+      </div>
+    );
+  };
+
   return (
-    <div className="fixed bottom-20 right-6 w-96 h-[500px] bg-white rounded-xl shadow-2xl border border-gray-200 flex flex-col z-50">
+    <div className="fixed bottom-20 right-6 w-96 h-[600px] bg-white rounded-xl shadow-2xl border border-gray-200 flex flex-col z-50">
       {/* Chat Header */}
       <div className="bg-sky-600 text-white p-4 rounded-t-xl flex items-center justify-between">
         <div className="flex items-center">
@@ -83,59 +229,60 @@ const ChatBot = ({ onClose }) => {
           </div>
           <div>
             <h3 className="font-semibold">FinanceAI Assistant</h3>
-            <p className="text-xs opacity-90">Online</p>
+            <p className="text-xs opacity-90 flex items-center">
+              <span
+                className={`w-2 h-2 rounded-full mr-1 ${
+                  isConnected ? "bg-green-400" : "bg-red-400"
+                }`}
+              ></span>
+              {isConnected ? "Connected" : "Disconnected"}
+            </p>
           </div>
         </div>
-        <button
-          onClick={onClose}
-          className="text-white hover:bg-white hover:bg-opacity-20 rounded-full p-1 transition-colors"
-        >
-          <svg
-            className="w-5 h-5"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
+        <div className="flex space-x-2">
+          <button
+            onClick={clearSession}
+            className="text-white hover:bg-white hover:bg-opacity-20 rounded-full p-1 transition-colors"
+            title="Clear conversation"
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M6 18L18 6M6 6l12 12"
-            />
-          </svg>
-        </button>
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+              />
+            </svg>
+          </button>
+          <button
+            onClick={onClose}
+            className="text-white hover:bg-white hover:bg-opacity-20 rounded-full p-1 transition-colors"
+          >
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </button>
+        </div>
       </div>
 
       {/* Messages Container */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.map((message) => (
-          <div
-            key={message.id}
-            className={`flex ${
-              message.sender === "user" ? "justify-end" : "justify-start"
-            }`}
-          >
-            <div
-              className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
-                message.sender === "user"
-                  ? "bg-sky-600 text-white"
-                  : "bg-gray-100 text-gray-800"
-              }`}
-            >
-              <p className="text-sm">{message.text}</p>
-              <p
-                className={`text-xs mt-1 ${
-                  message.sender === "user" ? "text-sky-100" : "text-gray-500"
-                }`}
-              >
-                {message.timestamp.toLocaleTimeString([], {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-              </p>
-            </div>
-          </div>
-        ))}
+        {messages.map(renderMessage)}
 
         {isTyping && (
           <div className="flex justify-start">
@@ -159,12 +306,13 @@ const ChatBot = ({ onClose }) => {
 
       {/* Quick Actions */}
       <div className="p-2 border-t border-gray-100">
-        <div className="flex flex-wrap gap-2 mb-2">
+        <div className="grid grid-cols-1 gap-2 mb-2 max-h-32 overflow-y-auto">
           {quickActions.map((action, index) => (
             <button
               key={index}
               onClick={() => handleQuickAction(action)}
-              className="px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-full text-xs transition-colors"
+              className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs transition-colors text-left"
+              disabled={isTyping}
             >
               {action}
             </button>
@@ -184,10 +332,11 @@ const ChatBot = ({ onClose }) => {
             onChange={(e) => setInputMessage(e.target.value)}
             placeholder="Ask me about your finances..."
             className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent text-sm"
+            disabled={isTyping}
           />
           <button
             type="submit"
-            disabled={!inputMessage.trim()}
+            disabled={!inputMessage.trim() || isTyping}
             className="bg-sky-600 hover:bg-sky-700 disabled:bg-gray-300 text-white px-4 py-2 rounded-lg transition-colors"
           >
             <svg

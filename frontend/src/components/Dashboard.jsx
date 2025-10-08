@@ -1,7 +1,12 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 
 const Dashboard = () => {
   const [activeTab, setActiveTab] = useState("overview");
+  const [dashboardData, setDashboardData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const API_BASE_URL = "http://localhost:8001/api/v1";
 
   const tabs = [
     { id: "overview", label: "Overview" },
@@ -10,85 +15,118 @@ const Dashboard = () => {
     { id: "goals", label: "Goals" },
   ];
 
-  const transactions = [
-    {
-      id: 1,
-      description: "Starbucks Coffee",
-      amount: -4.5,
-      category: "Food",
-      date: "2025-10-07",
-    },
-    {
-      id: 2,
-      description: "Salary Deposit",
-      amount: 3500.0,
-      category: "Income",
-      date: "2025-10-01",
-    },
-    {
-      id: 3,
-      description: "Netflix Subscription",
-      amount: -15.99,
-      category: "Entertainment",
-      date: "2025-10-05",
-    },
-    {
-      id: 4,
-      description: "Grocery Store",
-      amount: -89.45,
-      category: "Food",
-      date: "2025-10-06",
-    },
-    {
-      id: 5,
-      description: "Gas Station",
-      amount: -45.2,
-      category: "Transportation",
-      date: "2025-10-04",
-    },
-  ];
+  // Load dashboard data on component mount
+  useEffect(() => {
+    loadDashboardData();
+  }, []);
 
-  const budgetCategories = [
-    { name: "Food & Dining", spent: 245, budget: 400, color: "bg-blue-500" },
-    { name: "Transportation", spent: 180, budget: 300, color: "bg-green-500" },
-    { name: "Entertainment", spent: 85, budget: 150, color: "bg-purple-500" },
-    { name: "Utilities", spent: 220, budget: 250, color: "bg-orange-500" },
-    { name: "Shopping", spent: 320, budget: 200, color: "bg-red-500" },
-  ];
+  const loadDashboardData = async () => {
+    setLoading(true);
+    try {
+      // Fetch data from multiple endpoints
+      const [
+        analyticsRes,
+        transactionsRes,
+        investmentsRes,
+        goalsRes,
+        budgetRes,
+      ] = await Promise.all([
+        fetch(`${API_BASE_URL}/analytics/summary`),
+        fetch(`${API_BASE_URL}/data/transactions`),
+        fetch(`${API_BASE_URL}/data/investments`),
+        fetch(`${API_BASE_URL}/data/goals`),
+        fetch(`${API_BASE_URL}/data/budget`),
+      ]);
 
-  const investments = [
-    {
-      name: "S&P 500 ETF",
-      value: 15420,
-      change: "+2.4%",
-      changeType: "positive",
-    },
-    {
-      name: "Apple Inc.",
-      value: 8950,
-      change: "+1.8%",
-      changeType: "positive",
-    },
-    {
-      name: "Real Estate Fund",
-      value: 12300,
-      change: "-0.5%",
-      changeType: "negative",
-    },
-    {
-      name: "Tech Stocks",
-      value: 7680,
-      change: "+3.2%",
-      changeType: "positive",
-    },
-  ];
+      const analytics = await analyticsRes.json();
+      const transactions = await transactionsRes.json();
+      const investments = await investmentsRes.json();
+      const goals = await goalsRes.json();
+      const budget = await budgetRes.json();
 
-  const goals = [
-    { name: "Emergency Fund", current: 8500, target: 15000, progress: 57 },
-    { name: "Vacation", current: 2400, target: 5000, progress: 48 },
-    { name: "New Car", current: 12000, target: 25000, progress: 48 },
-    { name: "House Down Payment", current: 35000, target: 80000, progress: 44 },
-  ];
+      setDashboardData({
+        analytics: analytics.summary,
+        transactions: transactions.transactions.slice(0, 5), // Show recent 5
+        investments: investments.investments,
+        goals: goals.goals,
+        budget: budget.budget,
+      });
+
+      setError(null);
+    } catch (err) {
+      console.error("Error loading dashboard data:", err);
+      setError(
+        "Failed to load dashboard data. Make sure the backend server is running."
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+    }).format(amount);
+  };
+
+  const formatDate = (dateString) => {
+    return new Date(dateString).toLocaleDateString();
+  };
+
+  const calculateBudgetData = () => {
+    if (!dashboardData?.budget?.monthly_budgets) return [];
+
+    const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM format
+    const monthlyBudget = dashboardData.budget.monthly_budgets[currentMonth];
+
+    if (!monthlyBudget?.categories) return [];
+
+    return Object.entries(monthlyBudget.categories).map(([category, data]) => ({
+      name: category,
+      spent: data.spent || 0,
+      budget: data.budgeted || 0,
+      remaining: data.remaining || 0,
+      percentage_used: data.percentage_used || 0,
+      color: data.remaining < 0 ? "bg-red-500" : "bg-blue-500",
+    }));
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-sky-600"></div>
+          <p className="mt-4 text-gray-600">
+            Loading your financial dashboard...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center max-w-md">
+          <div className="text-red-500 text-6xl mb-4">⚠️</div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">
+            Connection Error
+          </h2>
+          <p className="text-gray-600 mb-4">{error}</p>
+          <button onClick={loadDashboardData} className="btn-primary">
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const analytics = dashboardData?.analytics || {};
+  const transactions = dashboardData?.transactions || [];
+  const investments = dashboardData?.investments || [];
+  const goals = dashboardData?.goals || [];
+  const budgetCategories = calculateBudgetData();
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -99,7 +137,7 @@ const Dashboard = () => {
             Financial Dashboard
           </h1>
           <p className="text-gray-600 mt-2">
-            Welcome back! Here's your financial summary.
+            Welcome back! Here's your financial summary powered by LangGraph AI.
           </p>
         </div>
 
@@ -108,9 +146,22 @@ const Dashboard = () => {
           <div className="card">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Total Balance</p>
-                <p className="text-2xl font-bold text-gray-900">$24,580</p>
-                <p className="text-sm text-green-600">+5.2% from last month</p>
+                <p className="text-sm text-gray-600">Net Cash Flow</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {formatCurrency(analytics.net_cash_flow || 0)}
+                </p>
+                <p
+                  className={`text-sm ${
+                    (analytics.net_cash_flow || 0) >= 0
+                      ? "text-green-600"
+                      : "text-red-600"
+                  }`}
+                >
+                  {(analytics.net_cash_flow || 0) >= 0
+                    ? "Positive"
+                    : "Negative"}{" "}
+                  cash flow
+                </p>
               </div>
               <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
                 <svg
@@ -133,9 +184,13 @@ const Dashboard = () => {
           <div className="card">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Monthly Spending</p>
-                <p className="text-2xl font-bold text-gray-900">$1,845</p>
-                <p className="text-sm text-red-600">+2.1% from last month</p>
+                <p className="text-sm text-gray-600">Total Expenses</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {formatCurrency(analytics.total_expenses_this_period || 0)}
+                </p>
+                <p className="text-sm text-gray-600">
+                  {analytics.transaction_count || 0} transactions
+                </p>
               </div>
               <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
                 <svg
@@ -158,9 +213,13 @@ const Dashboard = () => {
           <div className="card">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Investments</p>
-                <p className="text-2xl font-bold text-gray-900">$44,350</p>
-                <p className="text-sm text-green-600">+8.4% this year</p>
+                <p className="text-sm text-gray-600">Portfolio Value</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {formatCurrency(analytics.portfolio_value || 0)}
+                </p>
+                <p className="text-sm text-green-600">
+                  {investments.length} holdings
+                </p>
               </div>
               <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
                 <svg
@@ -183,9 +242,13 @@ const Dashboard = () => {
           <div className="card">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Savings Rate</p>
-                <p className="text-2xl font-bold text-gray-900">23%</p>
-                <p className="text-sm text-green-600">Above average</p>
+                <p className="text-sm text-gray-600">Goal Progress</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {formatCurrency(analytics.total_savings_toward_goals || 0)}
+                </p>
+                <p className="text-sm text-purple-600">
+                  {analytics.active_goals || 0} active goals
+                </p>
               </div>
               <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
                 <svg
@@ -238,62 +301,68 @@ const Dashboard = () => {
                     Recent Transactions
                   </h3>
                   <div className="space-y-3">
-                    {transactions.map((transaction) => (
-                      <div
-                        key={transaction.id}
-                        className="flex items-center justify-between py-3 border-b border-gray-100 last:border-b-0"
-                      >
-                        <div className="flex items-center">
-                          <div
-                            className={`w-10 h-10 rounded-full flex items-center justify-center mr-3 ${
+                    {transactions.length > 0 ? (
+                      transactions.map((transaction, index) => (
+                        <div
+                          key={index}
+                          className="flex items-center justify-between py-3 border-b border-gray-100 last:border-b-0"
+                        >
+                          <div className="flex items-center">
+                            <div
+                              className={`w-10 h-10 rounded-full flex items-center justify-center mr-3 ${
+                                transaction.amount > 0
+                                  ? "bg-green-100"
+                                  : "bg-red-100"
+                              }`}
+                            >
+                              <svg
+                                className={`w-5 h-5 ${
+                                  transaction.amount > 0
+                                    ? "text-green-600"
+                                    : "text-red-600"
+                                }`}
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d={
+                                    transaction.amount > 0
+                                      ? "M12 6v6m0 0v6m0-6h6m-6 0H6"
+                                      : "M20 12H4"
+                                  }
+                                />
+                              </svg>
+                            </div>
+                            <div>
+                              <p className="font-medium text-gray-900">
+                                {transaction.description}
+                              </p>
+                              <p className="text-sm text-gray-600">
+                                {transaction.category} •{" "}
+                                {formatDate(transaction.date)}
+                              </p>
+                            </div>
+                          </div>
+                          <span
+                            className={`font-semibold ${
                               transaction.amount > 0
-                                ? "bg-green-100"
-                                : "bg-red-100"
+                                ? "text-green-600"
+                                : "text-gray-900"
                             }`}
                           >
-                            <svg
-                              className={`w-5 h-5 ${
-                                transaction.amount > 0
-                                  ? "text-green-600"
-                                  : "text-red-600"
-                              }`}
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d={
-                                  transaction.amount > 0
-                                    ? "M12 6v6m0 0v6m0-6h6m-6 0H6"
-                                    : "M20 12H4"
-                                }
-                              />
-                            </svg>
-                          </div>
-                          <div>
-                            <p className="font-medium text-gray-900">
-                              {transaction.description}
-                            </p>
-                            <p className="text-sm text-gray-600">
-                              {transaction.category} • {transaction.date}
-                            </p>
-                          </div>
+                            {formatCurrency(transaction.amount)}
+                          </span>
                         </div>
-                        <span
-                          className={`font-semibold ${
-                            transaction.amount > 0
-                              ? "text-green-600"
-                              : "text-gray-900"
-                          }`}
-                        >
-                          {transaction.amount > 0 ? "+" : ""}$
-                          {Math.abs(transaction.amount).toFixed(2)}
-                        </span>
-                      </div>
-                    ))}
+                      ))
+                    ) : (
+                      <p className="text-gray-500 text-center py-4">
+                        No transactions available
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -305,50 +374,57 @@ const Dashboard = () => {
                   Budget Overview
                 </h3>
                 <div className="space-y-6">
-                  {budgetCategories.map((category, index) => (
-                    <div key={index}>
-                      <div className="flex justify-between items-center mb-2">
-                        <span className="font-medium text-gray-900">
-                          {category.name}
-                        </span>
-                        <span className="text-sm text-gray-600">
-                          ${category.spent} / ${category.budget}
-                        </span>
-                      </div>
-                      <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div
-                          className={`h-2 rounded-full ${category.color} ${
-                            category.spent > category.budget ? "bg-red-500" : ""
-                          }`}
-                          style={{
-                            width: `${Math.min(
-                              (category.spent / category.budget) * 100,
-                              100
-                            )}%`,
-                          }}
-                        ></div>
-                      </div>
-                      <div className="flex justify-between items-center mt-1">
-                        <span
-                          className={`text-xs ${
-                            category.spent > category.budget
-                              ? "text-red-600"
-                              : "text-gray-500"
-                          }`}
-                        >
-                          {((category.spent / category.budget) * 100).toFixed(
-                            0
-                          )}
-                          % used
-                        </span>
-                        {category.spent > category.budget && (
-                          <span className="text-xs text-red-600">
-                            Over budget!
+                  {budgetCategories.length > 0 ? (
+                    budgetCategories.map((category, index) => (
+                      <div key={index}>
+                        <div className="flex justify-between items-center mb-2">
+                          <span className="font-medium text-gray-900">
+                            {category.name}
                           </span>
-                        )}
+                          <span className="text-sm text-gray-600">
+                            {formatCurrency(Math.abs(category.spent))} /{" "}
+                            {formatCurrency(category.budget)}
+                          </span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div
+                            className={`h-2 rounded-full ${category.color}`}
+                            style={{
+                              width: `${Math.min(
+                                category.percentage_used,
+                                100
+                              )}%`,
+                            }}
+                          ></div>
+                        </div>
+                        <div className="flex justify-between items-center mt-1">
+                          <span
+                            className={`text-xs ${
+                              category.remaining < 0
+                                ? "text-red-600"
+                                : "text-gray-500"
+                            }`}
+                          >
+                            {category.percentage_used.toFixed(0)}% used
+                          </span>
+                          {category.remaining < 0 ? (
+                            <span className="text-xs text-red-600">
+                              Over budget by{" "}
+                              {formatCurrency(Math.abs(category.remaining))}!
+                            </span>
+                          ) : (
+                            <span className="text-xs text-green-600">
+                              {formatCurrency(category.remaining)} remaining
+                            </span>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    ))
+                  ) : (
+                    <p className="text-gray-500 text-center py-4">
+                      No budget data available
+                    </p>
+                  )}
                 </div>
               </div>
             )}
@@ -359,32 +435,46 @@ const Dashboard = () => {
                   Investment Portfolio
                 </h3>
                 <div className="space-y-4">
-                  {investments.map((investment, index) => (
-                    <div
-                      key={index}
-                      className="flex items-center justify-between p-4 bg-gray-50 rounded-lg"
-                    >
-                      <div>
-                        <p className="font-medium text-gray-900">
-                          {investment.name}
-                        </p>
-                        <p className="text-2xl font-bold text-gray-900">
-                          ${investment.value.toLocaleString()}
-                        </p>
+                  {investments.length > 0 ? (
+                    investments.map((investment, index) => (
+                      <div
+                        key={index}
+                        className="flex items-center justify-between p-4 bg-gray-50 rounded-lg"
+                      >
+                        <div>
+                          <p className="font-medium text-gray-900">
+                            {investment.company} ({investment.symbol})
+                          </p>
+                          <p className="text-2xl font-bold text-gray-900">
+                            {formatCurrency(investment.market_value)}
+                          </p>
+                          <p className="text-sm text-gray-600">
+                            {investment.shares} shares @{" "}
+                            {formatCurrency(investment.current_price)}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <span
+                            className={`text-sm font-medium ${
+                              investment.percentage_change >= 0
+                                ? "text-green-600"
+                                : "text-red-600"
+                            }`}
+                          >
+                            {investment.percentage_change >= 0 ? "+" : ""}
+                            {investment.percentage_change.toFixed(2)}%
+                          </span>
+                          <p className="text-sm text-gray-600">
+                            {formatCurrency(investment.unrealized_gain_loss)}
+                          </p>
+                        </div>
                       </div>
-                      <div className="text-right">
-                        <span
-                          className={`text-sm font-medium ${
-                            investment.changeType === "positive"
-                              ? "text-green-600"
-                              : "text-red-600"
-                          }`}
-                        >
-                          {investment.change}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
+                    ))
+                  ) : (
+                    <p className="text-gray-500 text-center py-4">
+                      No investment data available
+                    </p>
+                  )}
                 </div>
               </div>
             )}
@@ -395,34 +485,51 @@ const Dashboard = () => {
                   Financial Goals
                 </h3>
                 <div className="space-y-6">
-                  {goals.map((goal, index) => (
-                    <div key={index}>
-                      <div className="flex justify-between items-center mb-2">
-                        <span className="font-medium text-gray-900">
-                          {goal.name}
-                        </span>
-                        <span className="text-sm text-gray-600">
-                          ${goal.current.toLocaleString()} / $
-                          {goal.target.toLocaleString()}
-                        </span>
-                      </div>
-                      <div className="w-full bg-gray-200 rounded-full h-3">
-                        <div
-                          className="h-3 bg-sky-500 rounded-full"
-                          style={{ width: `${goal.progress}%` }}
-                        ></div>
-                      </div>
-                      <div className="flex justify-between items-center mt-1">
-                        <span className="text-xs text-gray-500">
-                          {goal.progress}% complete
-                        </span>
-                        <span className="text-xs text-gray-500">
-                          ${(goal.target - goal.current).toLocaleString()}{" "}
-                          remaining
-                        </span>
-                      </div>
-                    </div>
-                  ))}
+                  {goals.length > 0 ? (
+                    goals.map((goal, index) => {
+                      const progress =
+                        (goal.current_amount / goal.target_amount) * 100;
+                      return (
+                        <div key={index}>
+                          <div className="flex justify-between items-center mb-2">
+                            <span className="font-medium text-gray-900">
+                              {goal.name}
+                            </span>
+                            <span className="text-sm text-gray-600">
+                              {formatCurrency(goal.current_amount)} /{" "}
+                              {formatCurrency(goal.target_amount)}
+                            </span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-3">
+                            <div
+                              className="h-3 bg-sky-500 rounded-full"
+                              style={{ width: `${Math.min(progress, 100)}%` }}
+                            ></div>
+                          </div>
+                          <div className="flex justify-between items-center mt-1">
+                            <span className="text-xs text-gray-500">
+                              {progress.toFixed(1)}% complete
+                            </span>
+                            <span className="text-xs text-gray-500">
+                              {formatCurrency(
+                                goal.target_amount - goal.current_amount
+                              )}{" "}
+                              remaining
+                            </span>
+                          </div>
+                          {goal.deadline && (
+                            <p className="text-xs text-gray-500 mt-1">
+                              Target: {formatDate(goal.deadline)}
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <p className="text-gray-500 text-center py-4">
+                      No goals available
+                    </p>
+                  )}
                 </div>
               </div>
             )}
@@ -437,29 +544,29 @@ const Dashboard = () => {
               <div className="space-y-4">
                 <div className="p-3 bg-blue-50 rounded-lg">
                   <p className="text-sm text-blue-800 font-medium">
-                    💡 Spending Alert
+                    🤖 LangGraph Agent
                   </p>
                   <p className="text-sm text-blue-700 mt-1">
-                    You're spending 15% more on dining out this month. Consider
-                    cooking at home more often.
+                    Ask me anything about your finances! I can analyze expenses,
+                    track budgets, and provide insights.
                   </p>
                 </div>
                 <div className="p-3 bg-green-50 rounded-lg">
                   <p className="text-sm text-green-800 font-medium">
-                    📈 Investment Tip
+                    📊 Real-time Analysis
                   </p>
                   <p className="text-sm text-green-700 mt-1">
-                    Your portfolio is performing well. Consider rebalancing to
-                    maintain your target allocation.
+                    Your financial data is processed through multiple
+                    specialized tools for accurate insights.
                   </p>
                 </div>
                 <div className="p-3 bg-purple-50 rounded-lg">
                   <p className="text-sm text-purple-800 font-medium">
-                    🎯 Goal Update
+                    🎯 Personalized Recommendations
                   </p>
                   <p className="text-sm text-purple-700 mt-1">
-                    You're on track to reach your vacation goal! Keep saving
-                    $200/month.
+                    The AI agent provides context-aware suggestions based on
+                    your financial patterns.
                   </p>
                 </div>
               </div>
@@ -470,17 +577,20 @@ const Dashboard = () => {
                 Quick Actions
               </h3>
               <div className="space-y-3">
-                <button className="w-full btn-primary text-left">
-                  Add Transaction
+                <button
+                  onClick={loadDashboardData}
+                  className="w-full btn-primary text-left"
+                >
+                  Refresh Data
                 </button>
                 <button className="w-full btn-secondary text-left">
-                  Set New Goal
+                  Export Financial Report
                 </button>
                 <button className="w-full btn-secondary text-left">
-                  Export Data
+                  View API Documentation
                 </button>
                 <button className="w-full btn-secondary text-left">
-                  Schedule Report
+                  Check Agent Status
                 </button>
               </div>
             </div>
