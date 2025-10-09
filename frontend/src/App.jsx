@@ -16,7 +16,10 @@ function App() {
 
       {currentView === "home" && (
         <>
-          <Hero />
+          <Hero
+            setCurrentView={setCurrentView}
+            setShowChatBot={setShowChatBot}
+          />
           <Features />
         </>
       )}

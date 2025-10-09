@@ -1,10 +1,14 @@
 import React, { useState, useEffect } from "react";
+import FinanceAPI from "../api/financeAPI";
+import DataEntryModal from "./DataEntryModal";
 
 const Dashboard = () => {
   const [activeTab, setActiveTab] = useState("overview");
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [showDataEntry, setShowDataEntry] = useState(false);
+  const [dataEntryType, setDataEntryType] = useState("transaction");
 
   const API_BASE_URL = "http://localhost:8001/api/v1";
 
@@ -24,29 +28,23 @@ const Dashboard = () => {
     setLoading(true);
     try {
       // Fetch data from multiple endpoints
-      const [
-        analyticsRes,
-        transactionsRes,
-        investmentsRes,
-        goalsRes,
-        budgetRes,
-      ] = await Promise.all([
-        fetch(`${API_BASE_URL}/analytics/summary`),
-        fetch(`${API_BASE_URL}/data/transactions`),
-        fetch(`${API_BASE_URL}/data/investments`),
-        fetch(`${API_BASE_URL}/data/goals`),
-        fetch(`${API_BASE_URL}/data/budget`),
-      ]);
+      const [analytics, transactions, investments, goals, budget] =
+        await Promise.all([
+          FinanceAPI.getAnalyticsSummary(),
+          FinanceAPI.getTransactions(),
+          FinanceAPI.getInvestments(),
+          FinanceAPI.getGoals(),
+          FinanceAPI.getBudget(),
+        ]);
 
-      const analytics = await analyticsRes.json();
-      const transactions = await transactionsRes.json();
-      const investments = await investmentsRes.json();
-      const goals = await goalsRes.json();
-      const budget = await budgetRes.json();
+      // Sort transactions by date (most recent first) and take the first 5
+      const sortedTransactions = transactions.transactions
+        .sort((a, b) => new Date(b.date) - new Date(a.date))
+        .slice(0, 5);
 
       setDashboardData({
         analytics: analytics.summary,
-        transactions: transactions.transactions.slice(0, 5), // Show recent 5
+        transactions: sortedTransactions,
         investments: investments.investments,
         goals: goals.goals,
         budget: budget.budget,
@@ -128,17 +126,47 @@ const Dashboard = () => {
   const goals = dashboardData?.goals || [];
   const budgetCategories = calculateBudgetData();
 
+  const handleDataAdded = () => {
+    // Refresh dashboard data when new data is added
+    loadDashboardData();
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">
-            Financial Dashboard
-          </h1>
-          <p className="text-gray-600 mt-2">
-            Welcome back! Here's your financial summary powered by LangGraph AI.
-          </p>
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">
+                Financial Dashboard
+              </h1>
+              <p className="text-gray-600 mt-2">
+                Welcome back! Here's your financial summary powered by LangGraph
+                AI.
+              </p>
+            </div>
+            <div className="flex space-x-3">
+              <button
+                onClick={() => {
+                  setDataEntryType("transaction");
+                  setShowDataEntry(true);
+                }}
+                className="bg-sky-600 hover:bg-sky-700 text-white px-4 py-2 rounded-lg transition-colors"
+              >
+                + Add Transaction
+              </button>
+              <button
+                onClick={() => {
+                  setDataEntryType("goal");
+                  setShowDataEntry(true);
+                }}
+                className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors"
+              >
+                + Add Goal
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* Quick Stats */}
@@ -597,6 +625,14 @@ const Dashboard = () => {
           </div>
         </div>
       </div>
+
+      {/* Data Entry Modal */}
+      <DataEntryModal
+        isOpen={showDataEntry}
+        onClose={() => setShowDataEntry(false)}
+        onDataAdded={handleDataAdded}
+        type={dataEntryType}
+      />
     </div>
   );
 };

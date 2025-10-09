@@ -1,6 +1,14 @@
 import React from "react";
 
-const Hero = () => {
+const Hero = ({ setCurrentView, setShowChatBot }) => {
+  const handleGetStarted = () => {
+    setCurrentView("dashboard");
+  };
+
+  const handleWatchDemo = () => {
+    setShowChatBot(true);
+  };
+
   return (
     <section className="gradient-bg py-20 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
@@ -17,10 +25,16 @@ const Hero = () => {
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-            <button className="btn-primary text-lg px-8 py-4">
+            <button
+              onClick={handleGetStarted}
+              className="btn-primary text-lg px-8 py-4 hover:scale-105 transform transition-all duration-200"
+            >
               Start Your Journey
             </button>
-            <button className="btn-secondary text-lg px-8 py-4">
+            <button
+              onClick={handleWatchDemo}
+              className="btn-secondary text-lg px-8 py-4 hover:scale-105 transform transition-all duration-200"
+            >
               Watch Demo
             </button>
           </div>

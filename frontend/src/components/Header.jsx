@@ -51,7 +51,12 @@ const Header = ({ currentView, setCurrentView }) => {
 
           {/* CTA Button */}
           <div className="hidden md:block">
-            <button className="btn-primary">Get Started</button>
+            <button
+              onClick={() => setCurrentView("dashboard")}
+              className="btn-primary hover:scale-105 transform transition-all duration-200"
+            >
+              Get Started
+            </button>
           </div>
 
           {/* Mobile menu button */}

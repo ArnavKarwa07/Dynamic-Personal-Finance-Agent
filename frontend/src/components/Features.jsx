@@ -3,9 +3,9 @@ import React from "react";
 const Features = () => {
   const features = [
     {
-      title: "AI-Powered Budgeting",
+      title: "Transaction Analysis",
       description:
-        "Smart categorization and spending analysis with personalized recommendations.",
+        "AI-powered analysis of spending patterns, categorization, and merchant insights with LangGraph workflow.",
       icon: (
         <svg
           className="w-8 h-8"
@@ -22,11 +22,34 @@ const Features = () => {
         </svg>
       ),
       color: "bg-blue-500",
+      tools: ["TransactionAnalyzerTool"],
     },
     {
-      title: "Investment Insights",
+      title: "Budget Management",
       description:
-        "Real-time market analysis and portfolio optimization suggestions.",
+        "Smart budget tracking with overspending alerts and category-wise analysis for better financial control.",
+      icon: (
+        <svg
+          className="w-8 h-8"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"
+          />
+        </svg>
+      ),
+      color: "bg-green-500",
+      tools: ["BudgetManagerTool"],
+    },
+    {
+      title: "Investment Analysis",
+      description:
+        "Portfolio performance tracking, gains/losses analysis, and asset allocation insights.",
       icon: (
         <svg
           className="w-8 h-8"
@@ -42,33 +65,13 @@ const Features = () => {
           />
         </svg>
       ),
-      color: "bg-green-500",
-    },
-    {
-      title: "Expense Tracking",
-      description:
-        "Automatic transaction categorization with receipt scanning capabilities.",
-      icon: (
-        <svg
-          className="w-8 h-8"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"
-          />
-        </svg>
-      ),
       color: "bg-purple-500",
+      tools: ["InvestmentAnalyzerTool"],
     },
     {
-      title: "Goal Setting",
+      title: "Goal Tracking",
       description:
-        "Set and track financial goals with intelligent milestone planning.",
+        "Progress monitoring for financial goals with timeline analysis and recommendation engine.",
       icon: (
         <svg
           className="w-8 h-8"
@@ -85,11 +88,12 @@ const Features = () => {
         </svg>
       ),
       color: "bg-orange-500",
+      tools: ["GoalTrackerTool"],
     },
     {
-      title: "Smart Alerts",
+      title: "Financial Insights",
       description:
-        "Proactive notifications for bill payments, unusual spending, and opportunities.",
+        "Comprehensive financial health scoring with trend analysis and personalized recommendations.",
       icon: (
         <svg
           className="w-8 h-8"
@@ -101,16 +105,17 @@ const Features = () => {
             strokeLinecap="round"
             strokeLinejoin="round"
             strokeWidth={2}
-            d="M15 17h5l-5 5v-5zM9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+            d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
           />
         </svg>
       ),
       color: "bg-red-500",
+      tools: ["FinancialInsightsTool"],
     },
     {
-      title: "24/7 AI Assistant",
+      title: "LangGraph AI Agent",
       description:
-        "Chat with our AI for instant financial advice and transaction queries.",
+        "Advanced conversational AI powered by LangGraph workflow for intelligent financial assistance.",
       icon: (
         <svg
           className="w-8 h-8"
@@ -127,6 +132,7 @@ const Features = () => {
         </svg>
       ),
       color: "bg-indigo-500",
+      tools: ["IntentClassifierNode", "ResponseSynthesizerNode"],
     },
   ];
 
@@ -159,9 +165,21 @@ const Features = () => {
                   {feature.title}
                 </h3>
               </div>
-              <p className="text-gray-600 leading-relaxed">
+              <p className="text-gray-600 leading-relaxed mb-3">
                 {feature.description}
               </p>
+              {feature.tools && (
+                <div className="flex flex-wrap gap-1">
+                  {feature.tools.map((tool, toolIndex) => (
+                    <span
+                      key={toolIndex}
+                      className="inline-block bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded-full"
+                    >
+                      {tool}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
           ))}
         </div>

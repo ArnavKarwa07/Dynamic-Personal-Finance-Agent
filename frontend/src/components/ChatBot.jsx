@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
+import FinanceAPI from "../api/financeAPI";
 
 const ChatBot = ({ onClose }) => {
   const [messages, setMessages] = useState([
@@ -33,10 +34,8 @@ const ChatBot = ({ onClose }) => {
 
   const checkApiConnection = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/health`);
-      if (response.ok) {
-        setIsConnected(true);
-      }
+      await FinanceAPI.healthCheck();
+      setIsConnected(true);
     } catch (error) {
       console.error("API connection failed:", error);
       setIsConnected(false);
@@ -61,22 +60,7 @@ const ChatBot = ({ onClose }) => {
 
     try {
       // Call the finance agent API
-      const response = await fetch(`${API_BASE_URL}/chat`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          query: inputMessage,
-          session_id: sessionId,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`API error: ${response.status}`);
-      }
-
-      const data = await response.json();
+      const data = await FinanceAPI.chat(inputMessage, sessionId);
 
       // Update session ID if not set
       if (!sessionId) {
@@ -131,9 +115,7 @@ const ChatBot = ({ onClose }) => {
   const clearSession = async () => {
     if (sessionId) {
       try {
-        await fetch(`${API_BASE_URL}/session/${sessionId}`, {
-          method: "DELETE",
-        });
+        await FinanceAPI.clearSession(sessionId);
       } catch (error) {
         console.error("Error clearing session:", error);
       }
