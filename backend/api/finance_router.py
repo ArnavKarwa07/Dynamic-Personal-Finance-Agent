@@ -98,6 +98,9 @@ async def get_workflow_info():
             "INVESTMENT_INQUIRY",
             "GOAL_TRACKING",
             "FINANCIAL_INSIGHTS",
+            "RISK_ASSESSMENT",
+            "MARKET_INTELLIGENCE",
+            "ADVANCED_PLANNING",
             "GENERAL_INQUIRY",
         ],
         available_tools=[
@@ -106,6 +109,10 @@ async def get_workflow_info():
             "investment_analyzer",
             "goal_tracker",
             "financial_insights",
+            "advanced_financial_planner",
+            "risk_assessment",
+            "market_intelligence",
+            "graph_visualization",
         ],
     )
 
@@ -114,6 +121,112 @@ async def get_workflow_info():
 async def get_workflow_visualization():
     """Get a visual representation of the workflow"""
     return {"visualization": finance_agent.get_workflow_visualization()}
+
+
+@router.get("/agent/capabilities")
+async def get_agent_capabilities():
+    """Get comprehensive information about agent capabilities"""
+    try:
+        # Use the graph visualization tool to get comprehensive agent info
+        result = finance_agent.process_query_sync(
+            "Show me the agent workflow and capabilities"
+        )
+
+        if "graph_visualization" in result.get("analysis_results", {}):
+            return {
+                "agent_type": "LangGraph-powered Financial AI Agent",
+                "version": "2.0.0",
+                "capabilities": result["analysis_results"]["graph_visualization"],
+                "workflow_summary": finance_agent.get_workflow_visualization(),
+                "features": {
+                    "multi_tool_analysis": True,
+                    "conversational_ai": True,
+                    "contextual_routing": True,
+                    "state_management": True,
+                    "real_time_insights": True,
+                    "risk_assessment": True,
+                    "market_intelligence": True,
+                    "strategic_planning": True,
+                },
+                "supported_queries": [
+                    "How much did I spend on groceries this month?",
+                    "Am I on track with my budget?",
+                    "How are my investments performing?",
+                    "What are my financial risks?",
+                    "Show me market intelligence",
+                    "Create a comprehensive financial plan",
+                    "Analyze my spending patterns",
+                    "What's my financial health score?",
+                ],
+            }
+        else:
+            # Fallback response
+            return {
+                "agent_type": "LangGraph-powered Financial AI Agent",
+                "version": "2.0.0",
+                "description": "Advanced AI agent for comprehensive financial analysis and planning",
+                "tools_count": 8,
+                "capabilities": "Multi-tool financial analysis with intelligent routing",
+            }
+
+    except Exception as e:
+        return {
+            "error": "Could not retrieve agent capabilities",
+            "details": str(e),
+            "agent_type": "LangGraph Financial AI Agent",
+        }
+
+
+@router.post("/demo/showcase")
+async def demo_showcase():
+    """Showcase the agent's capabilities with sample queries"""
+    demo_queries = [
+        "What's my financial health score?",
+        "Show me my biggest spending risks",
+        "How is the technology sector performing?",
+        "Create a comprehensive retirement plan",
+    ]
+
+    results = []
+
+    for query in demo_queries:
+        try:
+            result = finance_agent.process_query_sync(query)
+            results.append(
+                {
+                    "query": query,
+                    "intent": result.get("intent"),
+                    "tools_used": result.get("tools_used", []),
+                    "response_preview": (
+                        result.get("response", "")[:200] + "..."
+                        if len(result.get("response", "")) > 200
+                        else result.get("response", "")
+                    ),
+                    "analysis_summary": {
+                        tool: f"Analysis completed with {len(str(data))} characters of data"
+                        for tool, data in result.get("analysis_results", {}).items()
+                    },
+                }
+            )
+        except Exception as e:
+            results.append({"query": query, "error": str(e)})
+
+    return {
+        "message": "Agent capability showcase",
+        "total_queries": len(demo_queries),
+        "results": results,
+        "agent_info": {
+            "workflow_nodes": 12,
+            "available_tools": 8,
+            "routing_strategies": 3,
+            "langgraph_features": [
+                "Conditional edge routing",
+                "State management",
+                "Multi-tool orchestration",
+                "Context-aware analysis",
+            ],
+        },
+    }
 
 
 @router.delete("/session/{session_id}")

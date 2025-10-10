@@ -100,16 +100,44 @@ const ChatBot = ({ onClose }) => {
   };
 
   const quickActions = [
-    "How much did I spend on food this month?",
-    "Am I over budget?",
-    "How are my investments performing?",
-    "How close am I to my emergency fund goal?",
-    "Give me a financial summary",
-    "Show me my spending by category",
+    {
+      text: "Show me the agent workflow",
+      description: "🤖 Visualize LangGraph architecture",
+      category: "Agent",
+    },
+    {
+      text: "What's my financial health score?",
+      description: "📊 Advanced financial planning",
+      category: "Planning",
+    },
+    {
+      text: "Analyze my financial risks",
+      description: "⚠️ Comprehensive risk assessment",
+      category: "Risk",
+    },
+    {
+      text: "How is the market performing?",
+      description: "📈 Market intelligence insights",
+      category: "Market",
+    },
+    {
+      text: "How much did I spend on food?",
+      description: "🍔 Transaction analysis",
+      category: "Spending",
+    },
+    {
+      text: "Am I over budget this month?",
+      description: "💰 Budget tracking",
+      category: "Budget",
+    },
   ];
 
   const handleQuickAction = (action) => {
-    setInputMessage(action);
+    if (typeof action === "string") {
+      setInputMessage(action);
+    } else {
+      setInputMessage(action.text);
+    }
   };
 
   const clearSession = async () => {
@@ -124,9 +152,10 @@ const ChatBot = ({ onClose }) => {
     setMessages([
       {
         id: 1,
-        text: "Hi! I'm your AI Financial Assistant powered by LangGraph. I can help you analyze expenses, track budgets, monitor investments, and achieve your financial goals. How can I help you today?",
+        text: "🤖 Hi! I'm your Advanced AI Financial Assistant powered by LangGraph!\n\nI use 8 specialized tools with intelligent routing to provide comprehensive financial analysis:\n\n📊 Transaction Analysis\n💰 Budget Management  \n📈 Investment Tracking\n🎯 Goal Monitoring\n🧠 Strategic Planning\n⚠️ Risk Assessment\n📰 Market Intelligence\n🔍 Financial Health Scoring\n\nTry asking me about your finances, or click a quick action below!",
         sender: "bot",
         timestamp: new Date(),
+        isWelcome: true,
       },
     ]);
     setSessionId(null);
@@ -287,18 +316,32 @@ const ChatBot = ({ onClose }) => {
       </div>
 
       {/* Quick Actions */}
-      <div className="p-2 border-t border-gray-100">
-        <div className="grid grid-cols-1 gap-2 mb-2 max-h-32 overflow-y-auto">
+      <div className="p-3 border-t border-gray-100">
+        <div className="text-xs font-medium text-gray-600 mb-2">
+          🚀 Try these AI-powered features:
+        </div>
+        <div className="grid grid-cols-1 gap-2 mb-2 max-h-40 overflow-y-auto">
           {quickActions.map((action, index) => (
             <button
               key={index}
               onClick={() => handleQuickAction(action)}
-              className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs transition-colors text-left"
+              className="px-3 py-2 bg-gradient-to-r from-gray-50 to-gray-100 hover:from-sky-50 hover:to-sky-100 text-gray-700 hover:text-sky-800 rounded-lg text-xs transition-all text-left border border-gray-200 hover:border-sky-300"
               disabled={isTyping}
             >
-              {action}
+              <div className="font-medium">{action.text}</div>
+              <div className="text-xs text-gray-500 mt-1">
+                {action.description}
+              </div>
+              <div className="inline-block mt-1">
+                <span className="px-2 py-0.5 bg-gray-200 text-gray-600 rounded-full text-xs">
+                  {action.category}
+                </span>
+              </div>
             </button>
           ))}
+        </div>
+        <div className="text-xs text-gray-500 text-center">
+          Powered by LangGraph • 8 AI Tools • Intelligent Routing
         </div>
       </div>
 

@@ -1,8 +1,8 @@
 import React from "react";
 
-const Hero = ({ setCurrentView, setShowChatBot }) => {
+const Hero = ({ setCurrentView, setShowChatBot, onDashboardAccess }) => {
   const handleGetStarted = () => {
-    setCurrentView("dashboard");
+    onDashboardAccess();
   };
 
   const handleWatchDemo = () => {

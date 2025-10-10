@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import FinanceAPI from "../api/financeAPI";
 import DataEntryModal from "./DataEntryModal";
+import AIInsights from "./AIInsights";
 
 const Dashboard = () => {
   const [activeTab, setActiveTab] = useState("overview");
@@ -393,6 +394,12 @@ const Dashboard = () => {
                     )}
                   </div>
                 </div>
+
+                {/* AI Insights Section */}
+                <AIInsights
+                  transactions={transactions}
+                  budget={dashboardData?.budget}
+                />
               </div>
             )}
 
@@ -565,9 +572,15 @@ const Dashboard = () => {
 
           {/* Sidebar */}
           <div className="space-y-6">
+            {/* AI Insights Component */}
+            <AIInsights
+              transactions={dashboardData?.transactions || []}
+              budget={dashboardData?.budget}
+            />
+
             <div className="card">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                AI Insights
+                LangGraph Agent Info
               </h3>
               <div className="space-y-4">
                 <div className="p-3 bg-blue-50 rounded-lg">
@@ -586,15 +599,6 @@ const Dashboard = () => {
                   <p className="text-sm text-green-700 mt-1">
                     Your financial data is processed through multiple
                     specialized tools for accurate insights.
-                  </p>
-                </div>
-                <div className="p-3 bg-purple-50 rounded-lg">
-                  <p className="text-sm text-purple-800 font-medium">
-                    🎯 Personalized Recommendations
-                  </p>
-                  <p className="text-sm text-purple-700 mt-1">
-                    The AI agent provides context-aware suggestions based on
-                    your financial patterns.
                   </p>
                 </div>
               </div>

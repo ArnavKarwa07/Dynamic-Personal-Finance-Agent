@@ -1,32 +1,76 @@
 import React, { useState } from "react";
+import { AuthProvider, useAuth } from "./context/AuthContext";
 import Header from "./components/Header";
 import Hero from "./components/Hero";
 import Features from "./components/Features";
 import ChatBot from "./components/ChatBot";
 import Dashboard from "./components/Dashboard";
+import Login from "./components/Login";
 import Footer from "./components/Footer";
 
-function App() {
+function AppContent() {
   const [showChatBot, setShowChatBot] = useState(false);
   const [currentView, setCurrentView] = useState("home");
+  const [showLogin, setShowLogin] = useState(false);
+  const { isAuthenticated, loading } = useAuth();
+
+  const handleLoginRequest = () => {
+    setShowLogin(true);
+  };
+
+  const handleDashboardAccess = () => {
+    if (!isAuthenticated) {
+      setShowLogin(true);
+    } else {
+      setCurrentView("dashboard");
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-sky-600"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Header currentView={currentView} setCurrentView={setCurrentView} />
+      <Header
+        currentView={currentView}
+        setCurrentView={setCurrentView}
+        onLoginRequest={handleLoginRequest}
+        onDashboardAccess={handleDashboardAccess}
+      />
 
       {currentView === "home" && (
         <>
           <Hero
             setCurrentView={setCurrentView}
             setShowChatBot={setShowChatBot}
+            onDashboardAccess={handleDashboardAccess}
           />
           <Features />
         </>
       )}
 
-      {currentView === "dashboard" && <Dashboard />}
+      {currentView === "dashboard" && isAuthenticated && <Dashboard />}
 
       <Footer />
+
+      {/* Login Modal */}
+      {showLogin && (
+        <Login
+          onClose={() => setShowLogin(false)}
+          onLoginSuccess={() => {
+            setShowLogin(false);
+            setCurrentView("dashboard");
+          }}
+        />
+      )}
 
       {/* Chat Bot Toggle Button */}
       <button
@@ -52,6 +96,14 @@ function App() {
       {/* Chat Bot Component */}
       {showChatBot && <ChatBot onClose={() => setShowChatBot(false)} />}
     </div>
+  );
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }
 

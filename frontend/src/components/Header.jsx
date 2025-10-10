@@ -1,10 +1,25 @@
 import React from "react";
+import { useAuth } from "../context/AuthContext";
 
-const Header = ({ currentView, setCurrentView }) => {
+const Header = ({
+  currentView,
+  setCurrentView,
+  onLoginRequest,
+  onDashboardAccess,
+}) => {
+  const { isAuthenticated, user, logout } = useAuth();
   const navItems = [
     { id: "home", label: "Home" },
     { id: "dashboard", label: "Dashboard" },
   ];
+
+  const handleNavClick = (itemId) => {
+    if (itemId === "dashboard") {
+      onDashboardAccess();
+    } else {
+      setCurrentView(itemId);
+    }
+  };
 
   return (
     <header className="bg-white shadow-sm border-b border-gray-200">
@@ -36,7 +51,7 @@ const Header = ({ currentView, setCurrentView }) => {
               {navItems.map((item) => (
                 <button
                   key={item.id}
-                  onClick={() => setCurrentView(item.id)}
+                  onClick={() => handleNavClick(item.id)}
                   className={`px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200 ${
                     currentView === item.id
                       ? "bg-sky-100 text-sky-700"
@@ -49,14 +64,45 @@ const Header = ({ currentView, setCurrentView }) => {
             </div>
           </nav>
 
-          {/* CTA Button */}
-          <div className="hidden md:block">
-            <button
-              onClick={() => setCurrentView("dashboard")}
-              className="btn-primary hover:scale-105 transform transition-all duration-200"
-            >
-              Get Started
-            </button>
+          {/* User Authentication Section */}
+          <div className="hidden md:flex items-center space-x-4">
+            {isAuthenticated ? (
+              <>
+                <div className="flex items-center space-x-2">
+                  <div className="w-8 h-8 bg-sky-600 rounded-full flex items-center justify-center">
+                    <span className="text-white text-sm font-medium">
+                      {user?.name?.charAt(0) ||
+                        user?.username?.charAt(0) ||
+                        "U"}
+                    </span>
+                  </div>
+                  <span className="text-gray-700 text-sm font-medium">
+                    {user?.name || user?.username}
+                  </span>
+                </div>
+                <button
+                  onClick={logout}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors duration-200"
+                >
+                  Logout
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={onLoginRequest}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors duration-200"
+                >
+                  Sign In
+                </button>
+                <button
+                  onClick={onDashboardAccess}
+                  className="btn-primary hover:scale-105 transform transition-all duration-200"
+                >
+                  Get Started
+                </button>
+              </>
+            )}
           </div>
 
           {/* Mobile menu button */}
