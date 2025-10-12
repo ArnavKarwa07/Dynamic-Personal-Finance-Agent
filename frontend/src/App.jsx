@@ -1,110 +1,149 @@
-import React, { useState } from "react";
-import { AuthProvider, useAuth } from "./context/AuthContext";
-import Header from "./components/Header";
-import Hero from "./components/Hero";
-import Features from "./components/Features";
-import ChatBot from "./components/ChatBot";
-import Dashboard from "./components/Dashboard";
-import Login from "./components/Login";
-import Footer from "./components/Footer";
+/**
+ * Main App Component with Routing
+ */
+import React, { useEffect } from "react";
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+} from "react-router-dom";
+import { AppProvider, useApp } from "@store/AppContext.jsx";
+import Layout from "@layout/Layout";
+import HomePage from "@pages/HomePage";
+import LoginPage from "@pages/LoginPage";
+import DashboardPage from "@pages/DashboardPage";
+import OnboardingPage from "@pages/OnboardingPage";
+import NotFoundPage from "@pages/NotFoundPage";
+import { financeAPI } from "@services/financeAPI";
 
-function AppContent() {
-  const [showChatBot, setShowChatBot] = useState(false);
-  const [currentView, setCurrentView] = useState("home");
-  const [showLogin, setShowLogin] = useState(false);
-  const { isAuthenticated, loading } = useAuth();
+// Protected Route Component
+const ProtectedRoute = ({ children }) => {
+  const { state } = useApp();
 
-  const handleLoginRequest = () => {
-    setShowLogin(true);
-  };
+  if (!state.user) {
+    return <Navigate to="/" replace />;
+  }
 
-  const handleDashboardAccess = () => {
-    if (!isAuthenticated) {
-      setShowLogin(true);
-    } else {
-      setCurrentView("dashboard");
-    }
-  };
+  return children;
+};
 
-  if (loading) {
+// App Content Component (inside AppProvider)
+const AppContent = () => {
+  const { state, dispatch } = useApp();
+
+  // Initialize app on mount
+  useEffect(() => {
+    const initializeApp = async () => {
+      try {
+        // Check for existing auth token
+        const token = localStorage.getItem("finance_token");
+        if (token) {
+          // Verify token and get user data
+          const userData = await financeAPI.verifyToken(token);
+          dispatch({
+            type: "SET_USER",
+            payload: userData.user,
+          });
+
+          if (userData.userProfile) {
+            dispatch({
+              type: "SET_USER_PROFILE",
+              payload: userData.userProfile,
+            });
+          }
+
+          if (userData.workflowStage) {
+            dispatch({
+              type: "SET_WORKFLOW_STAGE",
+              payload: userData.workflowStage,
+            });
+          }
+        }
+      } catch (error) {
+        // Token invalid, clear it
+        localStorage.removeItem("finance_token");
+        console.log("Token verification failed:", error);
+      } finally {
+        dispatch({
+          type: "SET_LOADING",
+          payload: false,
+        });
+      }
+    };
+
+    initializeApp();
+  }, [dispatch]);
+
+  // Show loading screen during initialization
+  if (state.isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-sky-600"></div>
-          <p className="mt-4 text-gray-600">Loading...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading your finance dashboard...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Header
-        currentView={currentView}
-        setCurrentView={setCurrentView}
-        onLoginRequest={handleLoginRequest}
-        onDashboardAccess={handleDashboardAccess}
-      />
-
-      {currentView === "home" && (
-        <>
-          <Hero
-            setCurrentView={setCurrentView}
-            setShowChatBot={setShowChatBot}
-            onDashboardAccess={handleDashboardAccess}
+    <Router
+      future={{
+        v7_startTransition: true,
+        v7_relativeSplatPath: true,
+      }}
+    >
+      <Layout>
+        <Routes>
+          {/* Public Routes */}
+          <Route
+            path="/"
+            element={
+              state.user ? <Navigate to="/dashboard" replace /> : <HomePage />
+            }
           />
-          <Features />
-        </>
-      )}
-
-      {currentView === "dashboard" && isAuthenticated && <Dashboard />}
-
-      <Footer />
-
-      {/* Login Modal */}
-      {showLogin && (
-        <Login
-          onClose={() => setShowLogin(false)}
-          onLoginSuccess={() => {
-            setShowLogin(false);
-            setCurrentView("dashboard");
-          }}
-        />
-      )}
-
-      {/* Chat Bot Toggle Button */}
-      <button
-        onClick={() => setShowChatBot(!showChatBot)}
-        className="fixed bottom-6 right-6 w-14 h-14 bg-sky-600 hover:bg-sky-700 text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center z-50"
-        aria-label="Toggle Chat Bot"
-      >
-        <svg
-          className="w-6 h-6"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+          <Route
+            path="/login"
+            element={
+              state.user ? <Navigate to="/dashboard" replace /> : <LoginPage />
+            }
           />
-        </svg>
-      </button>
 
-      {/* Chat Bot Component */}
-      {showChatBot && <ChatBot onClose={() => setShowChatBot(false)} />}
-    </div>
+          {/* Protected Routes */}
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <DashboardPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/onboarding"
+            element={
+              <ProtectedRoute>
+                <OnboardingPage />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Catch all route */}
+          <Route path="*" element={<NotFoundPage />} />
+        </Routes>
+      </Layout>
+    </Router>
   );
-}
+};
 
-function App() {
+// Main App Component
+const App = () => {
   return (
-    <AuthProvider>
+    <AppProvider>
       <AppContent />
-    </AuthProvider>
+    </AppProvider>
   );
-}
+};
 
 export default App;

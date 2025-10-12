@@ -1,144 +1,43 @@
-from typing import Optional
-from langgraph.graph import StateGraph, END
-from langchain_core.messages import HumanMessage, AIMessage
-from agents.nodes import (
-    FinanceAgentState,
-    UserInputNode,
-    IntentClassifierNode,
-    ContextRetrieverNode,
-    ResponseSynthesizerNode,
-    route_by_intent,
-    should_continue,
-)
-from tools.transaction_analyzer import TransactionAnalyzerTool
-from tools.budget_manager import BudgetManagerTool
-from tools.investment_analyzer import InvestmentAnalyzerTool
-from tools.goal_tracker import GoalTrackerTool
-from tools.financial_insights import FinancialInsightsTool
-from tools.advanced_financial_planner import AdvancedFinancialPlannerTool
-from tools.risk_assessment import RiskAssessmentTool
-from tools.market_intelligence import MarketIntelligenceTool
-from tools.graph_visualization import GraphVisualizationTool
+from typing import Optional, Dict, Any
+from core.simple_workflow import finance_workflow, FinanceState
 
 
 class FinanceAgent:
-    """Main LangGraph-based Personal Finance Agent"""
+    """Main Finance Agent that uses the simplified Groq-based workflow"""
 
     def __init__(self):
-        self.setup_tools()
-        self.setup_graph()
-
-    def setup_tools(self):
-        """Initialize all financial analysis tools"""
-        self.transaction_analyzer = TransactionAnalyzerTool()
-        self.budget_manager = BudgetManagerTool()
-        self.investment_analyzer = InvestmentAnalyzerTool()
-        self.goal_tracker = GoalTrackerTool()
-        self.financial_insights = FinancialInsightsTool()
-        self.advanced_financial_planner = AdvancedFinancialPlannerTool()
-        self.risk_assessment = RiskAssessmentTool()
-        self.market_intelligence = MarketIntelligenceTool()
-        self.graph_visualization = GraphVisualizationTool()
-
-    def setup_graph(self):
-        """Setup the LangGraph workflow"""
-        # Initialize nodes
-        self.user_input_node = UserInputNode()
-        self.intent_classifier_node = IntentClassifierNode()
-        self.context_retriever_node = ContextRetrieverNode()
-        self.response_synthesizer_node = ResponseSynthesizerNode()
-
-        # Create the state graph
-        workflow = StateGraph(FinanceAgentState)
-
-        # Add nodes to the graph
-        workflow.add_node("user_input", self.user_input_node)
-        workflow.add_node("intent_classifier", self.intent_classifier_node)
-        workflow.add_node("context_retriever", self.context_retriever_node)
-        workflow.add_node("transaction_analyzer", self.transaction_analyzer)
-        workflow.add_node("budget_manager", self.budget_manager)
-        workflow.add_node("investment_analyzer", self.investment_analyzer)
-        workflow.add_node("goal_tracker", self.goal_tracker)
-        workflow.add_node("financial_insights", self.financial_insights)
-        workflow.add_node("advanced_financial_planner", self.advanced_financial_planner)
-        workflow.add_node("risk_assessment", self.risk_assessment)
-        workflow.add_node("market_intelligence", self.market_intelligence)
-        workflow.add_node("graph_visualization", self.graph_visualization)
-        workflow.add_node("response_synthesizer", self.response_synthesizer_node)
-
-        # Define the workflow edges
-        workflow.set_entry_point("user_input")
-
-        # Sequential flow through core processing
-        workflow.add_edge("user_input", "intent_classifier")
-        workflow.add_edge("intent_classifier", "context_retriever")
-
-        # Conditional routing based on intent
-        workflow.add_conditional_edges(
-            "context_retriever",
-            route_by_intent,
-            {
-                "transaction_analyzer": "transaction_analyzer",
-                "budget_manager": "budget_manager",
-                "investment_analyzer": "investment_analyzer",
-                "goal_tracker": "goal_tracker",
-                "financial_insights": "financial_insights",
-                "advanced_financial_planner": "advanced_financial_planner",
-                "risk_assessment": "risk_assessment",
-                "market_intelligence": "market_intelligence",
-                "graph_visualization": "graph_visualization",
-                "response_synthesizer": "response_synthesizer",
-            },
-        )
-
-        # All tools route to response synthesizer
-        workflow.add_edge("transaction_analyzer", "response_synthesizer")
-        workflow.add_edge("budget_manager", "response_synthesizer")
-        workflow.add_edge("investment_analyzer", "response_synthesizer")
-        workflow.add_edge("goal_tracker", "response_synthesizer")
-        workflow.add_edge("financial_insights", "response_synthesizer")
-        workflow.add_edge("advanced_financial_planner", "response_synthesizer")
-        workflow.add_edge("risk_assessment", "response_synthesizer")
-        workflow.add_edge("market_intelligence", "response_synthesizer")
-        workflow.add_edge("graph_visualization", "response_synthesizer")
-
-        # Response synthesizer ends the workflow
-        workflow.add_edge("response_synthesizer", END)
-
-        # Compile the graph
-        self.app = workflow.compile()
+        self.workflow = finance_workflow
 
     async def process_query(
-        self, user_query: str, conversation_history: Optional[list] = None
-    ) -> dict:
+        self, user_query: str, user_id: str = "default", context: Optional[Dict[Any, Any]] = None
+    ) -> Dict[str, Any]:
         """Process a user financial query through the LangGraph workflow"""
-
+        
         # Initialize state
-        initial_state = {
-            "messages": conversation_history or [],
-            "user_query": user_query,
-            "intent": "",
-            "context": {},
-            "tools_used": [],
-            "analysis_results": {},
-            "response": "",
-        }
-
-        # Add user message to conversation
-        initial_state["messages"].append(HumanMessage(content=user_query))
+        initial_state = FinanceState(
+            user_id=user_id,
+            current_stage="Started",
+            user_query=user_query,
+            context=context or {},
+            messages=[],
+            intent="",
+            tools_used=[],
+            analysis_results={},
+            response="",
+            next_action=""
+        )
 
         try:
             # Run the workflow
-            final_state = await self.app.ainvoke(initial_state)
+            final_state = await self.workflow.run(initial_state)
 
             return {
-                "response": final_state.get(
-                    "response", "I'm sorry, I couldn't process your request."
-                ),
-                "intent": final_state.get("intent", ""),
-                "tools_used": final_state.get("tools_used", []),
-                "analysis_results": final_state.get("analysis_results", {}),
-                "conversation_history": final_state.get("messages", []),
+                "response": final_state.response,
+                "intent": final_state.intent,
+                "tools_used": final_state.tools_used,
+                "analysis_results": final_state.analysis_results,
+                "workflow_stage": final_state.current_stage,
+                "next_action": final_state.next_action
             }
 
         except Exception as e:
@@ -148,40 +47,40 @@ class FinanceAgent:
                 "intent": "ERROR",
                 "tools_used": [],
                 "analysis_results": {},
-                "conversation_history": initial_state["messages"],
+                "workflow_stage": "Started",
+                "next_action": ""
             }
 
     def process_query_sync(
-        self, user_query: str, conversation_history: Optional[list] = None
-    ) -> dict:
+        self, user_query: str, user_id: str = "default", context: Optional[Dict[Any, Any]] = None
+    ) -> Dict[str, Any]:
         """Synchronous version of process_query"""
-
+        
         # Initialize state
-        initial_state = {
-            "messages": conversation_history or [],
-            "user_query": user_query,
-            "intent": "",
-            "context": {},
-            "tools_used": [],
-            "analysis_results": {},
-            "response": "",
-        }
-
-        # Add user message to conversation
-        initial_state["messages"].append(HumanMessage(content=user_query))
+        initial_state = FinanceState(
+            user_id=user_id,
+            current_stage="Started",
+            user_query=user_query,
+            context=context or {},
+            messages=[],
+            intent="",
+            tools_used=[],
+            analysis_results={},
+            response="",
+            next_action=""
+        )
 
         try:
             # Run the workflow synchronously
-            final_state = self.app.invoke(initial_state)
+            final_state = self.workflow.run_sync(initial_state)
 
             return {
-                "response": final_state.get(
-                    "response", "I'm sorry, I couldn't process your request."
-                ),
-                "intent": final_state.get("intent", ""),
-                "tools_used": final_state.get("tools_used", []),
-                "analysis_results": final_state.get("analysis_results", {}),
-                "conversation_history": final_state.get("messages", []),
+                "response": final_state.response,
+                "intent": final_state.intent,
+                "tools_used": final_state.tools_used,
+                "analysis_results": final_state.analysis_results,
+                "workflow_stage": final_state.current_stage,
+                "next_action": final_state.next_action
             }
 
         except Exception as e:
@@ -191,7 +90,8 @@ class FinanceAgent:
                 "intent": "ERROR",
                 "tools_used": [],
                 "analysis_results": {},
-                "conversation_history": initial_state["messages"],
+                "workflow_stage": "Started",
+                "next_action": ""
             }
 
     def get_workflow_visualization(self) -> str:
@@ -200,64 +100,43 @@ class FinanceAgent:
         🤖 Advanced Personal Finance Agent Workflow (LangGraph):
         
         ┌─────────────────┐
-        │  User Input     │ ← Captures user query
+        │    Started      │ ← Initial onboarding and setup
         └─────────┬───────┘
                   │
         ┌─────────▼───────┐
-        │ Intent Classifier│ ← LLM-based intent detection
+        │      MVP        │ ← Basic expense tracking
         └─────────┬───────┘
                   │
         ┌─────────▼───────┐
-        │Context Retriever│ ← Loads relevant financial data
+        │ Intermediate    │ ← Smart budgeting with AI
         └─────────┬───────┘
                   │
         ┌─────────▼───────┐
-        │  Route by Intent │ ← Smart routing based on keywords & intent
-        └─────────┬───────┘
-                  │
-        ┌─────────▼───────┐
-        │    Tool Layer   │
-        ├─────────────────┤
-        │ 📊 Transaction  │ ← Spending patterns & analysis
-        │ 💰 Budget Mgmt  │ ← Budget tracking & alerts
-        │ 📈 Investments  │ ← Portfolio performance
-        │ 🎯 Goal Tracker │ ← Progress monitoring
-        │ 🔍 Insights     │ ← Financial health reports
-        │ 🧠 AI Planner   │ ← Strategic planning & optimization
-        │ ⚠️  Risk Assess │ ← Risk analysis & mitigation
-        │ 📰 Market Intel │ ← Market data & forecasts
-        └─────────┬───────┘
-                  │
-        ┌─────────▼───────┐
-        │Response Synth.  │ ← LLM generates natural language
-        └─────────┬───────┘
-                  │
-        ┌─────────▼───────┐
-        │      END        │
+        │   Advanced      │ ← Investment planning & portfolio mgmt
         └─────────────────┘
         
-        🔧 Specialized Financial Tools:
+        � Workflow Nodes:
         
-        Core Analysis:
-        • Transaction Analyzer: Spending patterns, categories, merchant insights
-        • Budget Manager: Performance tracking, overspending alerts, remaining funds
-        • Investment Analyzer: Portfolio performance, gains/losses, asset allocation
-        • Goal Tracker: Progress monitoring, timeline analysis, milestone tracking
-        • Financial Insights: Health scores, trends, basic recommendations
+        Core Processing:
+        • Onboarding Node: User profile setup and initial configuration
+        • Intent Classifier: AI-powered intent detection and routing
+        • Statement Parser: Financial document processing and extraction
+        • Budget Analyzer: Spending analysis and budget optimization
+        • Goal Planner: Financial goal setting and tracking
+        • RAG Knowledge: Knowledge base integration and retrieval
+        • Reasoning Engine: AI-powered financial reasoning and advice
+        • Task Decomposer: Complex task breakdown and planning
+        • ML Models: Predictive analytics and pattern recognition
+        • Action Executor: Automated action execution and follow-up
         
-        Advanced Intelligence:
-        • AI Financial Planner: Strategic planning, retirement readiness, optimization
-        • Risk Assessment: Vulnerability analysis, stress testing, mitigation strategies
-        • Market Intelligence: Real-time market data, sector analysis, economic forecasts
-        
-        🎯 Intelligent Routing:
-        The system uses both intent classification and keyword analysis to route
-        queries to the most appropriate specialized tool, ensuring comprehensive
-        and accurate financial analysis.
+        🎯 Progressive Workflow:
+        The system adapts to user's financial sophistication level and 
+        provides increasingly sophisticated features as they progress
+        through the workflow stages.
         
         🔄 State Management:
-        LangGraph maintains conversation state, tool usage tracking, and analysis
-        results throughout the workflow for context-aware responses.
+        LangGraph maintains comprehensive state including user context,
+        conversation history, and cross-node information sharing.
         """
 
 
