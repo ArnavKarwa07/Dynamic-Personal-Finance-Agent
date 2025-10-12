@@ -1,144 +1,103 @@
 """
-Auth Router - Authentication and user management endpoints
+Auth Router - DB-backed authentication endpoints (login/register/verify)
 """
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Header
 from pydantic import BaseModel
 from typing import Optional
+from sqlalchemy.orm import Session
 import logging
+
+from db.database import get_db
+from db import models as dbm
+from api.deps import verify_password, hash_password
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-# Request/Response Models
+
 class LoginRequest(BaseModel):
-    username: str
+    email: str
     password: str
+    name: Optional[str] = None
+
 
 class RegisterRequest(BaseModel):
-    username: str
     email: str
     password: str
-    full_name: Optional[str] = None
+    name: Optional[str] = None
 
-class AuthResponse(BaseModel):
-    access_token: str
-    token_type: str
-    user_id: str
-    username: str
 
-class UserProfile(BaseModel):
-    user_id: str
-    username: str
-    email: str
-    full_name: Optional[str] = None
-    created_at: str
-    last_login: Optional[str] = None
-
-@router.post("/login", response_model=AuthResponse)
-async def login(request: LoginRequest):
-    """
-    User login endpoint
-    """
+@router.post("/login")
+async def login(request: LoginRequest, db: Session = Depends(get_db)):
     try:
-        # Demo user credentials
-        if (request.username == "demo" and request.password == "demo123") or \
-           (request.username == "demo@example.com" and request.password == "demo123"):
-            return AuthResponse(
-                access_token="demo_jwt_token_123456789",
-                token_type="bearer",
-                user_id="demo_user_001",
-                username="demo"
-            )
-        # Allow any user for demo purposes
-        elif request.username and request.password:
-            return AuthResponse(
-                access_token=f"mock_jwt_token_{hash(request.username)}",
-                token_type="bearer",
-                user_id=f"user_{hash(request.username)}"[:12],
-                username=request.username
-            )
-        else:
-            raise HTTPException(
-                status_code=401,
-                detail="Invalid username or password"
-            )
-    
+        user = db.query(dbm.User).filter(dbm.User.email == request.email).first()
+        if not user:
+            raise HTTPException(status_code=401, detail="Invalid email or password")
+        if not verify_password(request.password, user.password_hash):
+            raise HTTPException(status_code=401, detail="Invalid email or password")
+        token = f"token_{user.id}"
+        return {
+            "message": "Login successful",
+            "user": {"id": user.id, "name": user.name, "email": user.email},
+            "token": token,
+            "workflow_stage": "Started",
+        }
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Login error: {e}")
         raise HTTPException(status_code=500, detail="Login failed")
 
-@router.post("/register", response_model=AuthResponse)
-async def register(request: RegisterRequest):
-    """
-    User registration endpoint
-    """
+
+@router.post("/register")
+async def register(request: RegisterRequest, db: Session = Depends(get_db)):
     try:
-        # In a real implementation, create user in database
-        # For now, simulate successful registration
-        
-        user_id = f"user_{hash(request.username)}_{hash(request.email)}"[:16]
-        
-        return AuthResponse(
-            access_token="mock_jwt_token_new_user",
-            token_type="bearer",
-            user_id=user_id,
-            username=request.username
+        existing = db.query(dbm.User).filter(dbm.User.email == request.email).first()
+        if existing:
+            raise HTTPException(status_code=400, detail="Email already registered")
+        user = dbm.User(
+            email=request.email,
+            name=request.name or request.email.split("@")[0].title(),
+            password_hash=hash_password(request.password),
         )
-    
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+        token = f"token_{user.id}"
+        return {
+            "message": "Registration successful",
+            "user": {"id": user.id, "name": user.name, "email": user.email},
+            "token": token,
+            "workflow_stage": "Started",
+        }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Registration error: {e}")
         raise HTTPException(status_code=500, detail="Registration failed")
 
-@router.get("/profile/{user_id}", response_model=UserProfile)
-async def get_user_profile(user_id: str):
-    """
-    Get user profile information
-    """
+
+@router.get("/verify")
+async def verify_token(authorization: Optional[str] = Header(default=None), db: Session = Depends(get_db)):
     try:
-        # In a real implementation, fetch from database
-        # For now, return mock data
-        
-        return UserProfile(
-            user_id=user_id,
-            username="demo_user",
-            email="demo@example.com", 
-            full_name="Demo User",
-            created_at="2024-01-01T00:00:00Z",
-            last_login="2024-01-01T12:00:00Z"
-        )
-    
+        token = None
+        if authorization and authorization.lower().startswith("bearer "):
+            token = authorization.split(" ", 1)[1]
+        if token and token.startswith("token_"):
+            id_part = token.split("_", 1)[1]
+            uid = int(id_part)
+            user = db.query(dbm.User).filter(dbm.User.id == uid).first()
+            if user:
+                return {"user": {"id": user.id, "name": user.name, "email": user.email}, "workflow_stage": "Started"}
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Profile fetch error: {e}")
-        raise HTTPException(status_code=500, detail="Could not fetch profile")
+        logger.error(f"Verify error: {e}")
+        raise HTTPException(status_code=500, detail="Verification failed")
+
 
 @router.post("/logout")
 async def logout():
-    """
-    User logout endpoint
-    """
-    try:
-        # In a real implementation, invalidate the JWT token
-        return {"message": "Successfully logged out"}
-    
-    except Exception as e:
-        logger.error(f"Logout error: {e}")
-        raise HTTPException(status_code=500, detail="Logout failed")
-
-@router.post("/refresh-token")
-async def refresh_token():
-    """
-    Refresh JWT token endpoint
-    """
-    try:
-        # In a real implementation, generate new JWT token
-        return {
-            "access_token": "refreshed_jwt_token_987654321",
-            "token_type": "bearer"
-        }
-    
-    except Exception as e:
-        logger.error(f"Token refresh error: {e}")
-        raise HTTPException(status_code=500, detail="Token refresh failed")
+    return {"message": "Logged out"}

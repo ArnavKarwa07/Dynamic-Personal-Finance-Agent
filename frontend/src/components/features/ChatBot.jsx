@@ -6,12 +6,13 @@ import { useApp } from "@store/AppContext";
 import { financeAPI } from "@services/financeAPI";
 import { cn } from "@utils";
 
-const ChatBot = ({ className }) => {
+const ChatBot = ({ className, variant = "floating" }) => {
   const { state, dispatch } = useApp();
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [trace, setTrace] = useState([]);
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = () => {
@@ -38,11 +39,13 @@ const ChatBot = ({ className }) => {
     try {
       const response = await financeAPI.chat({
         message: input,
+        user_id: state.user?.id,
         context: {
           currentWorkflowStage: state.workflowStage,
           userProfile: state.userProfile,
           recentTransactions: state.transactions?.slice(-5) || [],
         },
+        workflow_stage: state.workflowStage || "Started",
       });
 
       const botMessage = {
@@ -55,13 +58,26 @@ const ChatBot = ({ className }) => {
       };
 
       setMessages((prev) => [...prev, botMessage]);
+      if (Array.isArray(response.explanations)) {
+        setTrace(response.explanations);
+      }
 
-      // Update workflow stage if bot suggests transition
-      if (response.workflowUpdate?.newStage) {
-        dispatch({
-          type: "SET_WORKFLOW_STAGE",
-          payload: response.workflowUpdate.newStage,
-        });
+      // Update workflow stage based on API stage or workflowUpdate
+      const stageFromApi = response.stage;
+      const stageFromUpdate = response.workflowUpdate?.newStage;
+      const nextStage = stageFromUpdate || stageFromApi;
+      if (nextStage) {
+        const canonical = (s) => {
+          const map = {
+            started: "Started",
+            mvp: "MVP",
+            intermediate: "Intermediate",
+            advanced: "Advanced",
+          };
+          const key = String(s).toLowerCase();
+          return map[key] || s;
+        };
+        dispatch({ type: "SET_WORKFLOW_STAGE", payload: canonical(nextStage) });
       }
     } catch (error) {
       const errorMessage = {
@@ -95,7 +111,7 @@ const ChatBot = ({ className }) => {
     });
   };
 
-  if (!isExpanded) {
+  if (variant === "floating" && !isExpanded) {
     return (
       <div className={cn("fixed bottom-4 right-4 z-40", className)}>
         <button
@@ -121,10 +137,15 @@ const ChatBot = ({ className }) => {
     );
   }
 
+  const containerClasses =
+    variant === "floating"
+      ? "fixed bottom-4 right-4 z-40 w-96 h-[32rem]"
+      : "w-full h-[28rem]";
+
   return (
     <div
       className={cn(
-        "fixed bottom-4 right-4 z-40 w-96 h-[32rem] bg-white rounded-lg shadow-xl border",
+        containerClasses + " bg-white rounded-lg shadow-xl border",
         className
       )}
     >
@@ -145,48 +166,34 @@ const ChatBot = ({ className }) => {
             <p className="text-xs opacity-90">Stage: {state.workflowStage}</p>
           </div>
         </div>
-        <button
-          onClick={() => setIsExpanded(false)}
-          className="text-white hover:text-gray-200 transition-colors"
-          aria-label="Close chat"
-        >
-          <svg
-            className="w-5 h-5"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
+        {variant === "floating" && (
+          <button
+            onClick={() => setIsExpanded(false)}
+            className="text-white hover:text-gray-200 transition-colors"
+            aria-label="Close chat"
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M6 18L18 6M6 6l12 12"
-            />
-          </svg>
-        </button>
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </button>
+        )}
       </div>
 
       {/* Messages */}
       <div className="flex-1 p-4 h-80 overflow-y-auto space-y-4">
         {messages.length === 0 ? (
-          <div className="text-center text-gray-500 mt-8">
-            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg
-                className="w-8 h-8 text-gray-400"
-                fill="currentColor"
-                viewBox="0 0 20 20"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z"
-                  clipRule="evenodd"
-                />
-              </svg>
-            </div>
-            <p className="text-sm">
-              Hi! I'm your finance assistant. Ask me anything about your
-              financial goals, budgets, or investments.
-            </p>
+          <div className="text-center text-gray-500 mt-8 text-sm">
+            Ask anything about your finances to get started.
           </div>
         ) : (
           messages.map((message) => (
@@ -243,6 +250,21 @@ const ChatBot = ({ className }) => {
                 ></div>
               </div>
             </div>
+          </div>
+        )}
+        {/* Explainable AI trace */}
+        {trace.length > 0 && (
+          <div className="mt-4 space-y-2">
+            <h4 className="text-xs uppercase tracking-wide text-gray-500">
+              What the AI did
+            </h4>
+            <ol className="list-decimal ml-5 space-y-1">
+              {trace.map((t, i) => (
+                <li key={i} className="text-xs text-gray-700">
+                  <span className="font-medium">{t.step}:</span> {t.what}
+                </li>
+              ))}
+            </ol>
           </div>
         )}
         <div ref={messagesEndRef} />

@@ -140,6 +140,43 @@ npm run dev
 - `GET /api/v1/data/goals` - Financial goals
 - `GET /api/v1/data/budget` - Budget information
 
+### User-scoped CRUD (Demo/In-memory)
+
+These endpoints store data per user in memory for demo purposes. Replace with a database in production.
+
+- Transactions
+
+  - `GET /api/v1/transactions/{user_id}` — list
+  - `POST /api/v1/transactions/{user_id}` — create
+  - `GET /api/v1/transactions/{user_id}/{id}` — retrieve
+  - `PUT /api/v1/transactions/{user_id}/{id}` — update
+  - `DELETE /api/v1/transactions/{user_id}/{id}` — delete
+
+- Goals
+
+  - `GET /api/v1/goals/{user_id}` — list
+  - `POST /api/v1/goals/{user_id}` — create
+  - `GET /api/v1/goals/{user_id}/{id}` — retrieve
+  - `PUT /api/v1/goals/{user_id}/{id}` — update
+  - `DELETE /api/v1/goals/{user_id}/{id}` — delete
+
+- Budgets
+
+  - `GET /api/v1/budgets/{user_id}` — list
+  - `POST /api/v1/budgets/{user_id}` — create
+  - `GET /api/v1/budgets/{user_id}/{id}` — retrieve
+  - `PUT /api/v1/budgets/{user_id}/{id}` — update
+  - `DELETE /api/v1/budgets/{user_id}/{id}` — delete
+
+- Recurring Transactions
+  - `GET /api/v1/recurring/{user_id}` — list
+  - `POST /api/v1/recurring/{user_id}` — create
+  - `GET /api/v1/recurring/{user_id}/{id}` — retrieve
+  - `PUT /api/v1/recurring/{user_id}/{id}` — update
+  - `DELETE /api/v1/recurring/{user_id}/{id}` — delete
+  - `GET /api/v1/recurring/{user_id}/preview?periods=N` — preview next N dates
+  - `POST /api/v1/recurring/{user_id}/generate?up_to=YYYY-MM-DD` — materialize due transactions
+
 ### Analytics Endpoints
 
 - `GET /api/v1/analytics/summary` - Financial overview

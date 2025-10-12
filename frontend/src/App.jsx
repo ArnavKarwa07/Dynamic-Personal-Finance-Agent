@@ -1,4 +1,4 @@
- /**
+/**
  * Main App Component with Routing
  */
 import React, { useEffect } from "react";
@@ -16,6 +16,7 @@ import DashboardPage from "@pages/DashboardPage";
 import OnboardingPage from "@pages/OnboardingPage";
 import NotFoundPage from "@pages/NotFoundPage";
 import { financeAPI } from "@services/financeAPI";
+import AIPage from "@pages/AIPage";
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -116,6 +117,15 @@ const AppContent = () => {
             element={
               <ProtectedRoute>
                 <DashboardPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/ai"
+            element={
+              <ProtectedRoute>
+                <AIPage />
               </ProtectedRoute>
             }
           />

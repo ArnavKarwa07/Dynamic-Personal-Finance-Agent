@@ -3,6 +3,7 @@
  * Provides the overall structure for the application
  */
 import React from "react";
+import { useLocation } from "react-router-dom";
 import { useAppState, useAppActions } from "@store/AppContext";
 import Header from "./Header";
 import Footer from "./Footer";
@@ -13,6 +14,8 @@ import LoadingSpinner from "@components/ui/LoadingSpinner";
 
 const Layout = ({ children }) => {
   const { showLogin, isLoading, toast, error } = useAppState();
+  const location = useLocation();
+  const isAIPage = location.pathname === "/ai";
   const { clearError, clearToast } = useAppActions();
 
   return (
@@ -35,8 +38,8 @@ const Layout = ({ children }) => {
       {/* Footer */}
       <Footer />
 
-      {/* Floating Assistant */}
-      <FloatingAssistant />
+      {/* Floating Assistant (hidden on AI page to avoid duplicate chat) */}
+      {!isAIPage && <FloatingAssistant />}
 
       {/* Login Modal */}
       {showLogin && <LoginModal />}

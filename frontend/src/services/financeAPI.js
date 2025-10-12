@@ -11,6 +11,10 @@ class FinanceAPIService {
     this.headers = {
       "Content-Type": "application/json",
     };
+    const t =
+      typeof window !== "undefined" &&
+      window.localStorage?.getItem("finance_token");
+    if (t) this.setAuthToken(t);
   }
 
   // Set authentication token
@@ -160,6 +164,18 @@ class FinanceAPIService {
     return this.apiCall("/workflow/visualization");
   }
 
+  async runWorkflow({
+    message,
+    user_id,
+    workflow_stage = "Started",
+    context = null,
+  }) {
+    return this.apiCall("/workflow/run", {
+      method: "POST",
+      body: JSON.stringify({ message, user_id, workflow_stage, context }),
+    });
+  }
+
   // Tool and feature endpoints
   async getAvailableTools() {
     return this.apiCall("/tools");
@@ -202,6 +218,23 @@ class FinanceAPIService {
     });
   }
 
+  async getTransaction(userId, id) {
+    return this.apiCall(`/transactions/${userId}/${id}`);
+  }
+
+  async updateTransaction(userId, id, tx) {
+    return this.apiCall(`/transactions/${userId}/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(tx),
+    });
+  }
+
+  async deleteTransaction(userId, id) {
+    return this.apiCall(`/transactions/${userId}/${id}`, {
+      method: "DELETE",
+    });
+  }
+
   async getGoals(userId) {
     return this.apiCall(`/goals/${userId}`);
   }
@@ -213,6 +246,23 @@ class FinanceAPIService {
     });
   }
 
+  async getGoal(userId, id) {
+    return this.apiCall(`/goals/${userId}/${id}`);
+  }
+
+  async updateGoal(userId, id, goal) {
+    return this.apiCall(`/goals/${userId}/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(goal),
+    });
+  }
+
+  async deleteGoal(userId, id) {
+    return this.apiCall(`/goals/${userId}/${id}`, {
+      method: "DELETE",
+    });
+  }
+
   async getBudgets(userId) {
     return this.apiCall(`/budgets/${userId}`);
   }
@@ -221,6 +271,59 @@ class FinanceAPIService {
     return this.apiCall(`/budgets/${userId}`, {
       method: "POST",
       body: JSON.stringify(budget),
+    });
+  }
+
+  async getBudget(userId, id) {
+    return this.apiCall(`/budgets/${userId}/${id}`);
+  }
+
+  async updateBudget(userId, id, budget) {
+    return this.apiCall(`/budgets/${userId}/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(budget),
+    });
+  }
+
+  async deleteBudget(userId, id) {
+    return this.apiCall(`/budgets/${userId}/${id}`, {
+      method: "DELETE",
+    });
+  }
+
+  // Recurring transactions
+  async listRecurring(userId) {
+    return this.apiCall(`/recurring/${userId}`);
+  }
+
+  async createRecurring(userId, item) {
+    return this.apiCall(`/recurring/${userId}`, {
+      method: "POST",
+      body: JSON.stringify(item),
+    });
+  }
+
+  async updateRecurring(userId, id, item) {
+    return this.apiCall(`/recurring/${userId}/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(item),
+    });
+  }
+
+  async deleteRecurring(userId, id) {
+    return this.apiCall(`/recurring/${userId}/${id}`, {
+      method: "DELETE",
+    });
+  }
+
+  async previewRecurring(userId, periods = 3) {
+    return this.apiCall(`/recurring/${userId}/preview?periods=${periods}`);
+  }
+
+  async generateRecurring(userId, upTo = null) {
+    const qp = upTo ? `?up_to=${encodeURIComponent(upTo)}` : "";
+    return this.apiCall(`/recurring/${userId}/generate${qp}`, {
+      method: "POST",
     });
   }
 }

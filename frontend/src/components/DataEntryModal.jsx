@@ -7,6 +7,8 @@ const DataEntryModal = ({
   onDataAdded,
   type = "transaction",
   userId,
+  mode = "create", // "create" | "edit"
+  initialItem = null,
 }) => {
   const [formData, setFormData] = useState(getInitialFormData(type));
   const [loading, setLoading] = useState(false);
@@ -48,10 +50,59 @@ const DataEntryModal = ({
           budgeted_amount: "",
           month: new Date().toISOString().slice(0, 7), // YYYY-MM format
         };
+      case "recurring":
+        return {
+          description: "",
+          amount: "",
+          category: "",
+          start_date: new Date().toISOString().split("T")[0],
+          frequency: "monthly",
+          interval: 1,
+          end_date: "",
+        };
       default:
         return {};
     }
   }
+
+  // Prefill when editing
+  React.useEffect(() => {
+    if (!isOpen) return;
+    if (mode === "edit" && initialItem) {
+      if (type === "transaction") {
+        setFormData({
+          date: initialItem.date || new Date().toISOString().split("T")[0],
+          amount: initialItem.amount ?? "",
+          category: initialItem.category || "",
+          description: initialItem.description || "",
+          merchant: initialItem.merchant || "",
+          account_type: initialItem.account_type || "Checking",
+        });
+      } else if (type === "goal") {
+        setFormData({
+          name: initialItem.name || "",
+          description: initialItem.description || "",
+          target_amount: initialItem.target ?? "",
+          current_amount:
+            initialItem.current !== undefined ? initialItem.current : "",
+          target_date: initialItem.deadline || "",
+          category: initialItem.category || "",
+          monthly_contribution:
+            initialItem.monthly_contribution !== undefined
+              ? initialItem.monthly_contribution
+              : "",
+        });
+      } else if (type === "budget") {
+        setFormData({
+          category: initialItem.category || "",
+          budgeted_amount: initialItem.budgeted ?? "",
+          month: initialItem.month || new Date().toISOString().slice(0, 7),
+        });
+      }
+    } else {
+      setFormData(getInitialFormData(type));
+    }
+  }, [isOpen, mode, type, initialItem]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -75,7 +126,15 @@ const DataEntryModal = ({
           date: formData.date,
           category: formData.category,
         };
-        response = await financeAPI.addTransaction(userId, payload);
+        if (mode === "edit" && initialItem?.id) {
+          response = await financeAPI.updateTransaction(
+            userId,
+            initialItem.id,
+            payload
+          );
+        } else {
+          response = await financeAPI.addTransaction(userId, payload);
+        }
       } else if (type === "goal") {
         const payload = {
           name: formData.name,
@@ -85,14 +144,49 @@ const DataEntryModal = ({
             : 0,
           deadline: formData.target_date || null,
         };
-        response = await financeAPI.addGoal(userId, payload);
+        if (mode === "edit" && initialItem?.id) {
+          response = await financeAPI.updateGoal(
+            userId,
+            initialItem.id,
+            payload
+          );
+        } else {
+          response = await financeAPI.addGoal(userId, payload);
+        }
       } else if (type === "budget") {
         const payload = {
           category: formData.category,
           budgeted: parseFloat(formData.budgeted_amount),
           month: formData.month,
         };
-        response = await financeAPI.addBudget(userId, payload);
+        if (mode === "edit" && initialItem?.id) {
+          response = await financeAPI.updateBudget(
+            userId,
+            initialItem.id,
+            payload
+          );
+        } else {
+          response = await financeAPI.addBudget(userId, payload);
+        }
+      } else if (type === "recurring") {
+        const payload = {
+          description: formData.description,
+          amount: parseFloat(formData.amount),
+          category: formData.category,
+          start_date: formData.start_date,
+          frequency: formData.frequency,
+          interval: parseInt(formData.interval || 1, 10),
+          end_date: formData.end_date || null,
+        };
+        if (mode === "edit" && initialItem?.id) {
+          response = await financeAPI.updateRecurring(
+            userId,
+            initialItem.id,
+            payload
+          );
+        } else {
+          response = await financeAPI.createRecurring(userId, payload);
+        }
       } else {
         throw new Error(`Unsupported data type: ${type}`);
       }
@@ -143,6 +237,18 @@ const DataEntryModal = ({
       "Health & Fitness",
       "Savings",
     ],
+    recurring: [
+      "Housing",
+      "Food & Dining",
+      "Transportation",
+      "Shopping",
+      "Entertainment",
+      "Utilities",
+      "Health & Fitness",
+      "Savings",
+      "Income",
+      "Subscriptions",
+    ],
   };
 
   return (
@@ -150,7 +256,8 @@ const DataEntryModal = ({
       <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-bold text-gray-900">
-            Add New {type.charAt(0).toUpperCase() + type.slice(1)}
+            {mode === "edit" ? "Edit" : "Add New"}{" "}
+            {type.charAt(0).toUpperCase() + type.slice(1)}
           </h2>
           <button
             onClick={onClose}
@@ -176,6 +283,117 @@ const DataEntryModal = ({
           <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
             {error}
           </div>
+        )}
+
+        {type === "recurring" && (
+          <>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Description
+              </label>
+              <input
+                type="text"
+                name="description"
+                value={formData.description}
+                onChange={handleInputChange}
+                required
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-500"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Amount
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  name="amount"
+                  value={formData.amount}
+                  onChange={handleInputChange}
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Category
+                </label>
+                <select
+                  name="category"
+                  value={formData.category}
+                  onChange={handleInputChange}
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-500"
+                >
+                  <option value="">Select category</option>
+                  {categories.recurring.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {cat}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Start Date
+                </label>
+                <input
+                  type="date"
+                  name="start_date"
+                  value={formData.start_date}
+                  onChange={handleInputChange}
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  End Date (optional)
+                </label>
+                <input
+                  type="date"
+                  name="end_date"
+                  value={formData.end_date}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-500"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Frequency
+                </label>
+                <select
+                  name="frequency"
+                  value={formData.frequency}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-500"
+                >
+                  <option value="daily">Daily</option>
+                  <option value="weekly">Weekly</option>
+                  <option value="monthly">Monthly</option>
+                  <option value="yearly">Yearly</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Interval
+                </label>
+                <input
+                  type="number"
+                  name="interval"
+                  min="1"
+                  value={formData.interval}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-500"
+                />
+              </div>
+            </div>
+          </>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -392,8 +610,12 @@ const DataEntryModal = ({
               className="px-4 py-2 bg-sky-600 text-white rounded-md hover:bg-sky-700 disabled:opacity-50"
             >
               {loading
-                ? "Adding..."
-                : `Add ${type.charAt(0).toUpperCase() + type.slice(1)}`}
+                ? mode === "edit"
+                  ? "Saving..."
+                  : "Adding..."
+                : `${mode === "edit" ? "Save" : "Add"} ${
+                    type.charAt(0).toUpperCase() + type.slice(1)
+                  }`}
             </button>
           </div>
         </form>

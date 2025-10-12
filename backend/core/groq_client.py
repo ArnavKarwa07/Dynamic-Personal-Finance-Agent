@@ -158,6 +158,55 @@ Provide clear, actionable financial advice based on the user's query. Be specifi
         else:
             return "general_inquiry"
 
+    async def extract_action(self, text: str) -> Dict[str, Any]:
+        """Extract a structured action from natural language user text.
+        Returns a JSON-friendly dict with keys: action (str) and params (dict).
+        Action can be one of:
+          add_transaction, update_transaction, delete_transaction,
+          add_goal, update_goal, delete_goal,
+          add_budget, update_budget, delete_budget,
+          add_recurring, update_recurring, delete_recurring,
+          none
+        """
+        system = (
+            "You extract a SINGLE structured action from a user's message about personal finances. "
+            "Return ONLY valid JSON with keys 'action' and 'params'. "
+            "Dates must be ISO (YYYY-MM-DD). If information is missing, set it to null. "
+            "Do not include any explanations."
+        )
+        schema_hint = {
+            "action": "add_transaction",
+            "params": {
+                "description": "Coffee",
+                "amount": -4.5,
+                "date": "2025-10-12",
+                "category": "Food & Dining",
+                "id": None,
+                "month": None,
+            },
+        }
+        messages = [
+            {"role": "system", "content": system},
+            {"role": "user", "content": f"Message: {text}\nSchema example: {json.dumps(schema_hint)}"},
+        ]
+        try:
+            raw = await self.chat(messages, temperature=0)
+            # Attempt to parse JSON: often models wrap in code fences
+            raw_str = raw.strip()
+            if raw_str.startswith("```) "):
+                raw_str = raw_str.split("\n", 1)[1].strip()
+            if raw_str.startswith("```json"):
+                raw_str = raw_str.strip("`\n").replace("json\n", "")
+            data = json.loads(raw_str)
+            action = data.get("action", "none")
+            params = data.get("params", {})
+            if not isinstance(params, dict):
+                params = {}
+            return {"action": action, "params": params}
+        except Exception as e:
+            # Fallback: no action
+            return {"action": "none", "params": {}}
+
 
 # Create global instance
 groq_client = GroqClient()

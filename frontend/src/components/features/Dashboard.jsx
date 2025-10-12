@@ -18,8 +18,11 @@ const Dashboard = () => {
   const [transactions, setTransactions] = useState([]);
   const [goalsList, setGoalsList] = useState([]);
   const [budgets, setBudgets] = useState([]);
+  const [recurring, setRecurring] = useState([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [modalType, setModalType] = useState("transaction");
+  const [modalMode, setModalMode] = useState("create");
+  const [selectedItem, setSelectedItem] = useState(null);
 
   useEffect(() => {
     loadDashboardData();
@@ -31,9 +34,10 @@ const Dashboard = () => {
   const loadDashboardData = async () => {
     try {
       setIsLoading(true);
-      const data = await financeAPI.getDashboard({
-        timeframe: selectedTimeframe,
-      });
+      const params = { timeframe: selectedTimeframe };
+      const data = state.user?.id
+        ? await financeAPI.getDashboard({ ...params, user_id: state.user.id })
+        : await financeAPI.getDashboard(params);
       setDashboardData(data);
       setError(null);
     } catch (err) {
@@ -97,14 +101,16 @@ const Dashboard = () => {
 
   const loadUserLists = async (userId) => {
     try {
-      const [tx, gl, bd] = await Promise.all([
+      const [tx, gl, bd, rc] = await Promise.all([
         financeAPI.getTransactions(userId),
         financeAPI.getGoals(userId),
         financeAPI.getBudgets(userId),
+        financeAPI.listRecurring(userId),
       ]);
       setTransactions(tx || []);
       setGoalsList(gl || []);
       setBudgets(bd || []);
+      setRecurring(rc || []);
     } catch (e) {
       console.error("Failed loading user lists", e);
     }
@@ -236,14 +242,7 @@ const Dashboard = () => {
         />
       </div>
 
-      {/* Workflow Progress */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-lg font-semibold mb-4">Workflow Progress</h2>
-        <WorkflowProgress
-          currentStage={state.workflowStage}
-          onStageChange={handleWorkflowStageChange}
-        />
-      </div>
+      {/* Workflow Progress moved to AI page */}
 
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -271,21 +270,58 @@ const Dashboard = () => {
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold">Recent Transactions</h2>
             {state.user && (
-              <button
-                className="text-sm px-3 py-1 rounded-md bg-blue-600 text-white"
-                onClick={() => {
-                  setModalType("transaction");
-                  setModalOpen(true);
-                }}
-              >
-                Add Transaction
-              </button>
+              <div className="flex gap-2">
+                <button
+                  className="text-sm px-3 py-1 rounded-md bg-blue-600 text-white"
+                  onClick={() => {
+                    setModalType("transaction");
+                    setModalMode("create");
+                    setSelectedItem(null);
+                    setModalOpen(true);
+                  }}
+                >
+                  Add Transaction
+                </button>
+                <button
+                  className="text-sm px-3 py-1 rounded-md bg-purple-600 text-white"
+                  onClick={() => {
+                    setModalType("recurring");
+                    setModalMode("create");
+                    setSelectedItem(null);
+                    setModalOpen(true);
+                  }}
+                >
+                  Add Recurring
+                </button>
+              </div>
             )}
           </div>
           <div className="space-y-3">
             {(state.user ? transactions : recentTransactions.slice(0, 5)).map(
               (transaction, index) => (
-                <TransactionItem key={index} transaction={transaction} />
+                <TransactionItem
+                  key={index}
+                  transaction={transaction}
+                  onEdit={() => {
+                    setModalType("transaction");
+                    setModalMode("edit");
+                    setSelectedItem(transaction);
+                    setModalOpen(true);
+                  }}
+                  onDelete={async () => {
+                    try {
+                      if (!state.user?.id || !transaction?.id) return;
+                      await financeAPI.deleteTransaction(
+                        state.user.id,
+                        transaction.id
+                      );
+                      await loadUserLists(state.user.id);
+                    } catch (e) {
+                      console.error("Delete transaction failed", e);
+                    }
+                  }}
+                  canManage={!!state.user}
+                />
               )
             )}
             {state.user && transactions.length === 0 && (
@@ -310,6 +346,8 @@ const Dashboard = () => {
                 className="text-sm px-3 py-1 rounded-md bg-blue-600 text-white"
                 onClick={() => {
                   setModalType("goal");
+                  setModalMode("create");
+                  setSelectedItem(null);
                   setModalOpen(true);
                 }}
               >
@@ -319,7 +357,26 @@ const Dashboard = () => {
           </div>
           <div className="space-y-3">
             {(state.user ? goalsList : goals).map((goal, index) => (
-              <GoalItem key={index} goal={goal} />
+              <GoalItem
+                key={index}
+                goal={goal}
+                canManage={!!state.user}
+                onEdit={() => {
+                  setModalType("goal");
+                  setModalMode("edit");
+                  setSelectedItem(goal);
+                  setModalOpen(true);
+                }}
+                onDelete={async () => {
+                  try {
+                    if (!state.user?.id || !goal?.id) return;
+                    await financeAPI.deleteGoal(state.user.id, goal.id);
+                    await loadUserLists(state.user.id);
+                  } catch (e) {
+                    console.error("Delete goal failed", e);
+                  }
+                }}
+              />
             ))}
             {state.user && goalsList.length === 0 && (
               <p className="text-gray-500 text-center py-4">
@@ -332,20 +389,97 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* AI Insights */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-lg font-semibold mb-4">AI Insights</h2>
-          <div className="space-y-3">
-            {insights.map((insight, index) => (
-              <InsightItem key={index} insight={insight} />
-            ))}
-            {insights.length === 0 && (
-              <p className="text-gray-500 text-center py-4">
-                No insights available
-              </p>
-            )}
+        {/* Recurring Transactions (user-specific) */}
+        {state.user && (
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold">Recurring Transactions</h2>
+              <div className="flex gap-2">
+                <button
+                  className="text-sm px-3 py-1 rounded-md bg-purple-600 text-white"
+                  onClick={() => {
+                    setModalType("recurring");
+                    setModalMode("create");
+                    setSelectedItem(null);
+                    setModalOpen(true);
+                  }}
+                >
+                  New Recurring
+                </button>
+                <button
+                  className="text-sm px-3 py-1 rounded-md bg-gray-800 text-white"
+                  onClick={async () => {
+                    try {
+                      if (!state.user?.id) return;
+                      const today = new Date().toISOString().split("T")[0];
+                      await financeAPI.generateRecurring(state.user.id, today);
+                      await loadUserLists(state.user.id);
+                    } catch (e) {
+                      console.error("Generate recurring failed", e);
+                    }
+                  }}
+                >
+                  Materialize Due
+                </button>
+              </div>
+            </div>
+            <div className="space-y-3">
+              {recurring.map((r) => (
+                <div key={r.id} className="p-3 bg-gray-50 rounded-lg border">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <p className="font-medium">{r.description}</p>
+                      <p className="text-sm text-gray-600">
+                        {r.category} • ${r.amount} • {r.frequency}
+                        {r.interval && r.interval > 1
+                          ? ` x${r.interval}`
+                          : ""}{" "}
+                        • next: {r.next_date}
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        className="text-xs px-2 py-1 rounded border"
+                        onClick={() => {
+                          setModalType("recurring");
+                          setModalMode("edit");
+                          setSelectedItem(r);
+                          setModalOpen(true);
+                        }}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        className="text-xs px-2 py-1 rounded border text-red-600"
+                        onClick={async () => {
+                          try {
+                            if (!state.user?.id) return;
+                            await financeAPI.deleteRecurring(
+                              state.user.id,
+                              r.id
+                            );
+                            await loadUserLists(state.user.id);
+                          } catch (e) {
+                            console.error("Delete recurring failed", e);
+                          }
+                        }}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {recurring.length === 0 && (
+                <p className="text-gray-500 text-center py-4">
+                  No recurring transactions
+                </p>
+              )}
+            </div>
           </div>
-        </div>
+        )}
+
+        {/* AI Insights moved to AI page */}
       </div>
 
       {/* Budgets list (user-specific) */}
@@ -357,6 +491,8 @@ const Dashboard = () => {
               className="text-sm px-3 py-1 rounded-md bg-blue-600 text-white"
               onClick={() => {
                 setModalType("budget");
+                setModalMode("create");
+                setSelectedItem(null);
                 setModalOpen(true);
               }}
             >
@@ -373,6 +509,33 @@ const Dashboard = () => {
                 <p className="text-sm text-gray-700 mt-1">
                   Budgeted: ${b.budgeted}
                 </p>
+                <div className="flex gap-2 mt-2">
+                  <button
+                    className="text-xs px-2 py-1 rounded border"
+                    onClick={() => {
+                      setModalType("budget");
+                      setModalMode("edit");
+                      setSelectedItem(b);
+                      setModalOpen(true);
+                    }}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    className="text-xs px-2 py-1 rounded border text-red-600"
+                    onClick={async () => {
+                      try {
+                        if (!state.user?.id || !b?.id) return;
+                        await financeAPI.deleteBudget(state.user.id, b.id);
+                        await loadUserLists(state.user.id);
+                      } catch (e) {
+                        console.error("Delete budget failed", e);
+                      }
+                    }}
+                  >
+                    Delete
+                  </button>
+                </div>
               </div>
             ))}
             {budgets.length === 0 && (
@@ -388,6 +551,8 @@ const Dashboard = () => {
         onDataAdded={() => state.user?.id && loadUserLists(state.user.id)}
         type={modalType}
         userId={state.user?.id}
+        mode={modalMode}
+        initialItem={selectedItem}
       />
     </div>
   );
@@ -488,7 +653,7 @@ const BudgetCategoryItem = ({ category }) => {
 };
 
 // Transaction Item Component
-const TransactionItem = ({ transaction }) => {
+const TransactionItem = ({ transaction, onEdit, onDelete, canManage }) => {
   const { description, amount, date, category } = transaction;
   const isExpense = amount < 0;
 
@@ -508,12 +673,25 @@ const TransactionItem = ({ transaction }) => {
       >
         {isExpense ? "-" : "+"}${Math.abs(amount)}
       </span>
+      {canManage && (
+        <div className="flex gap-2 ml-3">
+          <button className="text-xs px-2 py-1 rounded border" onClick={onEdit}>
+            Edit
+          </button>
+          <button
+            className="text-xs px-2 py-1 rounded border text-red-600"
+            onClick={onDelete}
+          >
+            Delete
+          </button>
+        </div>
+      )}
     </div>
   );
 };
 
 // Goal Item Component
-const GoalItem = ({ goal }) => {
+const GoalItem = ({ goal, onEdit, onDelete, canManage }) => {
   const { name, target, current, deadline } = goal;
   const percentage = (current / target) * 100;
 
@@ -521,7 +699,25 @@ const GoalItem = ({ goal }) => {
     <div className="p-3 bg-gray-50 rounded-lg">
       <div className="flex justify-between items-center mb-2">
         <span className="font-medium">{name}</span>
-        <span className="text-sm text-gray-600">{deadline}</span>
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-gray-600">{deadline}</span>
+          {canManage && (
+            <>
+              <button
+                className="text-xs px-2 py-1 rounded border"
+                onClick={onEdit}
+              >
+                Edit
+              </button>
+              <button
+                className="text-xs px-2 py-1 rounded border text-red-600"
+                onClick={onDelete}
+              >
+                Delete
+              </button>
+            </>
+          )}
+        </div>
       </div>
       <div className="flex justify-between items-center mb-1">
         <span className="text-sm">

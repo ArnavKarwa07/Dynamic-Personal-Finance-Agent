@@ -56,6 +56,9 @@ class FinanceState(TypedDict):
     profile_complete: bool
     execute_action: bool
 
+    # Explainable AI trace
+    explanations: Annotated[List[Dict[str, Any]], operator.add]
+
 
 class FinancialPlanningWorkflow:
     """
@@ -173,6 +176,16 @@ class FinancialPlanningWorkflow:
     async def _system_stage_router(self, state: FinanceState) -> FinanceState:
         """System stage router - main entry point"""
         state["tools_used"].append("system_stage_router")
+        state.setdefault("explanations", [])
+        state["explanations"].append({
+            "step": "system_stage_router",
+            "what": "Determine workflow stage based on consent and profile",
+            "input": {
+                "consent_given": state.get("consent_given"),
+                "profile_complete": state.get("profile_complete"),
+                "context": state.get("context", {})
+            }
+        })
 
         # Determine stage based on user profile and history
         if not state.get("consent_given", False):
@@ -196,6 +209,12 @@ class FinancialPlanningWorkflow:
     async def _onboarding_node(self, state: FinanceState) -> FinanceState:
         """Handle user onboarding, goals, consent, and profile setup"""
         state["tools_used"].append("onboarding_node")
+        state.setdefault("explanations", [])
+        state["explanations"].append({
+            "step": "onboarding_node",
+            "what": "Analyze onboarding requirements and prepare profile fields",
+            "input": {"user_query": state.get("user_query")}
+        })
 
         # Use Groq to analyze onboarding needs
         onboarding_prompt = f"""
@@ -236,6 +255,12 @@ class FinancialPlanningWorkflow:
     async def _intent_classifier(self, state: FinanceState) -> FinanceState:
         """Rule-based intent classification"""
         state["tools_used"].append("intent_classifier")
+        state.setdefault("explanations", [])
+        state["explanations"].append({
+            "step": "intent_classifier",
+            "what": "Classify the user's intent using Groq + heuristics",
+            "input": {"user_query": state.get("user_query")}
+        })
 
         # Use Groq for intent classification
         result = await groq_client.analyze_financial_query(
@@ -250,6 +275,11 @@ class FinancialPlanningWorkflow:
     async def _statement_parser(self, state: FinanceState) -> FinanceState:
         """Parse CSV/PDF financial statements"""
         state["tools_used"].append("statement_parser")
+        state.setdefault("explanations", [])
+        state["explanations"].append({
+            "step": "statement_parser",
+            "what": "Parse statements (placeholder until uploads supported)",
+        })
 
         # Simulate statement parsing
         state["analysis_results"]["parsed_statements"] = {
@@ -264,6 +294,15 @@ class FinancialPlanningWorkflow:
     async def _budget_analyzer(self, state: FinanceState) -> FinanceState:
         """Categorize and compute budget analysis"""
         state["tools_used"].append("budget_analyzer")
+        state.setdefault("explanations", [])
+        state["explanations"].append({
+            "step": "budget_analyzer",
+            "what": "Generate budget insights based on query and context",
+            "input": {
+                "intent": state.get("intent"),
+                "context": state.get("context", {})
+            }
+        })
 
         # Use Groq for budget analysis
         budget_prompt = f"""
@@ -292,6 +331,11 @@ class FinancialPlanningWorkflow:
     async def _goal_planner(self, state: FinanceState) -> FinanceState:
         """Simple interest calculations and goal planning"""
         state["tools_used"].append("goal_planner")
+        state.setdefault("explanations", [])
+        state["explanations"].append({
+            "step": "goal_planner",
+            "what": "Suggest goals and timelines",
+        })
 
         # Goal planning analysis
         state["analysis_results"]["goal_planning"] = {
@@ -305,6 +349,11 @@ class FinancialPlanningWorkflow:
     async def _task_decomposer(self, state: FinanceState) -> FinanceState:
         """Multi-step plan decomposition for advanced users"""
         state["tools_used"].append("task_decomposer")
+        state.setdefault("explanations", [])
+        state["explanations"].append({
+            "step": "task_decomposer",
+            "what": "Decompose complex request into actionable steps",
+        })
 
         # Advanced task decomposition
         decomp_prompt = f"""
@@ -326,6 +375,15 @@ class FinancialPlanningWorkflow:
     async def _reasoning_engine(self, state: FinanceState) -> FinanceState:
         """LLM + Symbolic + RAG reasoning for intermediate/advanced stages"""
         state["tools_used"].append("reasoning_engine")
+        state.setdefault("explanations", [])
+        state["explanations"].append({
+            "step": "reasoning_engine",
+            "what": "Apply advanced reasoning to synthesize recommendations",
+            "input": {
+                "intent": state.get("intent"),
+                "stage": state.get("current_stage")
+            }
+        })
 
         # Advanced reasoning using Groq
         reasoning_prompt = f"""
@@ -355,6 +413,11 @@ class FinancialPlanningWorkflow:
     async def _rag_knowledge_retriever(self, state: FinanceState) -> FinanceState:
         """RAG knowledge retrieval for tax docs and FAQs"""
         state["tools_used"].append("rag_knowledge_retriever")
+        state.setdefault("explanations", [])
+        state["explanations"].append({
+            "step": "rag_knowledge_retriever",
+            "what": "Retrieve relevant knowledge for the topic",
+        })
 
         # Simulate RAG knowledge retrieval
         state["analysis_results"]["knowledge_base"] = {
@@ -372,6 +435,11 @@ class FinancialPlanningWorkflow:
     async def _ml_models(self, state: FinanceState) -> FinanceState:
         """ML models for advanced financial analysis"""
         state["tools_used"].append("ml_models")
+        state.setdefault("explanations", [])
+        state["explanations"].append({
+            "step": "ml_models",
+            "what": "Run forecasting and optimization models",
+        })
 
         # Advanced ML analysis
         state["analysis_results"]["ml_analysis"] = {
@@ -386,6 +454,12 @@ class FinancialPlanningWorkflow:
     async def _finance_tools(self, state: FinanceState) -> FinanceState:
         """Execute various financial tools"""
         state["tools_used"].append("finance_tools")
+        state.setdefault("explanations", [])
+        state["explanations"].append({
+            "step": "finance_tools",
+            "what": "Use tools based on intent",
+            "input": {"intent": state.get("intent")}
+        })
 
         # Determine which tools to use based on intent
         tools_results = {}
@@ -404,6 +478,12 @@ class FinancialPlanningWorkflow:
     async def _action_executor(self, state: FinanceState) -> FinanceState:
         """Execute actions with 2FA and audit trail"""
         state["tools_used"].append("action_executor")
+        state.setdefault("explanations", [])
+        state["explanations"].append({
+            "step": "action_executor",
+            "what": "Decide whether to execute actions or provide suggestions",
+            "decision": "execute" if state.get("current_stage") == WorkflowStage.ADVANCED.value else "suggestions_only"
+        })
 
         # Determine execution vs suggestions
         if state.get("current_stage") == WorkflowStage.ADVANCED.value:
@@ -425,6 +505,11 @@ class FinancialPlanningWorkflow:
     async def _dashboard_generator(self, state: FinanceState) -> FinanceState:
         """Generate dashboard with PDF reports and suggestions"""
         state["tools_used"].append("dashboard_generator")
+        state.setdefault("explanations", [])
+        state["explanations"].append({
+            "step": "dashboard_generator",
+            "what": "Prepare dashboard sections and suggestions",
+        })
 
         state["analysis_results"]["dashboard"] = {
             "report_generated": True,
@@ -438,6 +523,11 @@ class FinancialPlanningWorkflow:
     async def _notification_sender(self, state: FinanceState) -> FinanceState:
         """Send notifications via Email/SMS/Push"""
         state["tools_used"].append("notification_sender")
+        state.setdefault("explanations", [])
+        state["explanations"].append({
+            "step": "notification_sender",
+            "what": "Send relevant alerts to the user",
+        })
 
         state["analysis_results"]["notifications"] = {
             "alerts_sent": ["Budget threshold warning", "Goal milestone achieved"],
@@ -450,6 +540,11 @@ class FinancialPlanningWorkflow:
     async def _feedback_collector(self, state: FinanceState) -> FinanceState:
         """Collect user feedback for continuous improvement"""
         state["tools_used"].append("feedback_collector")
+        state.setdefault("explanations", [])
+        state["explanations"].append({
+            "step": "feedback_collector",
+            "what": "Summarize findings and propose next action",
+        })
 
         # Generate final response
         response_prompt = f"""
@@ -480,6 +575,11 @@ class FinancialPlanningWorkflow:
     async def _continuous_learning(self, state: FinanceState) -> FinanceState:
         """Log acceptance/rejection for model improvement"""
         state["tools_used"].append("continuous_learning")
+        state.setdefault("explanations", [])
+        state["explanations"].append({
+            "step": "continuous_learning",
+            "what": "Record feedback for future improvements",
+        })
 
         state["analysis_results"]["learning"] = {
             "feedback_logged": True,

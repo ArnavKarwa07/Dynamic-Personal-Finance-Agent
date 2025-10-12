@@ -42,23 +42,26 @@ const Header = () => {
 
             {/* Navigation Links */}
             <nav className="hidden md:flex space-x-6">
-              <Link
-                to="/"
-                className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                  isActive("/")
-                    ? "text-blue-600 bg-blue-50"
-                    : "text-gray-700 hover:text-blue-600 hover:bg-gray-50"
-                }`}
-              >
-                Home
-              </Link>
-
-              <a
-                href="#features"
-                className="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50 transition-colors"
-              >
-                Features
-              </a>
+              {!isAuthenticated && (
+                <>
+                  <Link
+                    to="/"
+                    className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                      isActive("/")
+                        ? "text-blue-600 bg-blue-50"
+                        : "text-gray-700 hover:text-blue-600 hover:bg-gray-50"
+                    }`}
+                  >
+                    Home
+                  </Link>
+                  <a
+                    href="#features"
+                    className="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50 transition-colors"
+                  >
+                    Features
+                  </a>
+                </>
+              )}
 
               {isAuthenticated && (
                 <Link
@@ -70,6 +73,19 @@ const Header = () => {
                   }`}
                 >
                   Dashboard
+                </Link>
+              )}
+
+              {isAuthenticated && (
+                <Link
+                  to="/ai"
+                  className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                    isActive("/ai")
+                      ? "text-blue-600 bg-blue-50"
+                      : "text-gray-700 hover:text-blue-600 hover:bg-gray-50"
+                  }`}
+                >
+                  AI
                 </Link>
               )}
             </nav>
