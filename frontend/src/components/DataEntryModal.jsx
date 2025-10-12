@@ -1,11 +1,12 @@
 import React, { useState } from "react";
-import FinanceAPI from "../api/financeAPI";
+import financeAPI from "@services/financeAPI";
 
 const DataEntryModal = ({
   isOpen,
   onClose,
   onDataAdded,
   type = "transaction",
+  userId,
 }) => {
   const [formData, setFormData] = useState(getInitialFormData(type));
   const [loading, setLoading] = useState(false);
@@ -65,10 +66,33 @@ const DataEntryModal = ({
     try {
       let response;
 
+      if (!userId) throw new Error("Missing user id");
+
       if (type === "transaction") {
-        response = await FinanceAPI.addTransaction(formData);
+        const payload = {
+          description: formData.description,
+          amount: parseFloat(formData.amount),
+          date: formData.date,
+          category: formData.category,
+        };
+        response = await financeAPI.addTransaction(userId, payload);
       } else if (type === "goal") {
-        response = await FinanceAPI.addGoal(formData);
+        const payload = {
+          name: formData.name,
+          target: parseFloat(formData.target_amount),
+          current: formData.current_amount
+            ? parseFloat(formData.current_amount)
+            : 0,
+          deadline: formData.target_date || null,
+        };
+        response = await financeAPI.addGoal(userId, payload);
+      } else if (type === "budget") {
+        const payload = {
+          category: formData.category,
+          budgeted: parseFloat(formData.budgeted_amount),
+          month: formData.month,
+        };
+        response = await financeAPI.addBudget(userId, payload);
       } else {
         throw new Error(`Unsupported data type: ${type}`);
       }
@@ -80,7 +104,8 @@ const DataEntryModal = ({
       onClose();
       setFormData(getInitialFormData(type));
     } catch (err) {
-      setError(`Failed to add ${type}. Please try again.`);
+      const msg = err?.message || `Failed to add ${type}. Please try again.`;
+      setError(msg);
       console.error(`Error adding ${type}:`, err);
     } finally {
       setLoading(false);

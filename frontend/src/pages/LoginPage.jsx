@@ -375,7 +375,7 @@ const LoginPage = () => {
               <button
                 type="button"
                 onClick={toggleMode}
-                className="w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium text-primary-600 hover:text-primary-500 focus:outline-none focus:underline transition-colors"
+                className="w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium text-blue-600 hover:text-blue-500 focus:outline-none focus:underline transition-colors"
               >
                 {isLogin
                   ? "Create a new account"

@@ -2,6 +2,7 @@
 FastAPI server with Groq-based LangGraph workflow
 Clean implementation without HuggingFace dependencies
 """
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -34,11 +35,16 @@ app = FastAPI(
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000"],
+    allow_origins=[
+        "http://localhost:5173",
+        "http://localhost:5174",
+        "http://localhost:3000",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 # Pydantic models
 class ChatRequest(BaseModel):
@@ -47,27 +53,32 @@ class ChatRequest(BaseModel):
     user_id: str = "default"
     workflow_stage: str = "Started"
 
+
 class AuthRequest(BaseModel):
     email: str
     password: str
     name: Optional[str] = None
 
+
 class OnboardingRequest(BaseModel):
     user_data: Dict[str, Any]
+
+
+# (Stores and data models are declared below alongside their routes)
 
 
 @app.get("/")
 async def root():
     return {
         "message": "Dynamic Personal Finance Agent API",
-        "version": "2.0.0", 
+        "version": "2.0.0",
         "description": "Multi-stage LangGraph workflow with Groq API integration",
         "groq_status": "Connected" if groq_client.api_key else "API Key Missing",
         "workflow_stages": {
             "started": "User onboarding and consent",
             "mvp": "Basic budgeting and goal planning",
             "intermediate": "Advanced budgeting with AI insights",
-            "advanced": "Sophisticated portfolio management"
+            "advanced": "Sophisticated portfolio management",
         },
         "endpoints": {
             "chat": "/api/v1/chat",
@@ -83,9 +94,9 @@ async def root():
 async def health_check():
     groq_status = "healthy" if groq_client.api_key else "missing_api_key"
     return {
-        "status": "healthy", 
+        "status": "healthy",
         "service": "finance-agent-api",
-        "groq_integration": groq_status
+        "groq_integration": groq_status,
     }
 
 
@@ -108,21 +119,21 @@ async def chat_with_agent(request: ChatRequest):
             messages=[],
             consent_given=request.workflow_stage != "Started",
             profile_complete=request.workflow_stage in ["intermediate", "advanced"],
-            execute_action=False
+            execute_action=False,
         )
-        
+
         # Run through LangGraph workflow
         result_state = await finance_workflow.run_async(state)
-        
+
         return {
             "response": result_state["response"],
             "intent": result_state["intent"],
             "workflow_stage": result_state["current_stage"],
             "tools_used": result_state["tools_used"],
             "analysis_results": result_state["analysis_results"],
-            "next_action": result_state["next_action"]
+            "next_action": result_state["next_action"],
         }
-        
+
     except Exception as e:
         logger.error(f"Chat error: {e}")
         raise HTTPException(status_code=500, detail=f"Error processing chat: {str(e)}")
@@ -135,13 +146,9 @@ async def login(request: AuthRequest):
     if request.email == "demo@example.com" and request.password == "demo123":
         return {
             "message": "Login successful",
-            "user": {
-                "id": "demo_user",
-                "name": "Demo User",
-                "email": request.email
-            },
+            "user": {"id": "demo_user", "name": "Demo User", "email": request.email},
             "token": "demo_token_123",
-            "workflow_stage": "Started"
+            "workflow_stage": "Started",
         }
     else:
         # For demo purposes, accept any login
@@ -150,10 +157,10 @@ async def login(request: AuthRequest):
             "user": {
                 "id": "user_" + request.email.split("@")[0],
                 "name": request.email.split("@")[0].title(),
-                "email": request.email
+                "email": request.email,
             },
             "token": "token_" + request.email.split("@")[0],
-            "workflow_stage": "Started"
+            "workflow_stage": "Started",
         }
 
 
@@ -165,10 +172,10 @@ async def register(request: AuthRequest):
         "user": {
             "id": "user_" + request.email.split("@")[0],
             "name": request.name or request.email.split("@")[0].title(),
-            "email": request.email
+            "email": request.email,
         },
         "token": "token_" + request.email.split("@")[0],
-        "workflow_stage": "Started"
+        "workflow_stage": "Started",
     }
 
 
@@ -176,12 +183,8 @@ async def register(request: AuthRequest):
 async def verify_token():
     """Token verification endpoint"""
     return {
-        "user": {
-            "id": "demo_user",
-            "name": "Demo User",
-            "email": "demo@example.com"
-        },
-        "workflow_stage": "Started"
+        "user": {"id": "demo_user", "name": "Demo User", "email": "demo@example.com"},
+        "workflow_stage": "Started",
     }
 
 
@@ -197,25 +200,77 @@ async def get_dashboard():
             {"name": "Food & Dining", "budgeted": 600, "spent": 485, "percentage": 81},
             {"name": "Transportation", "budgeted": 400, "spent": 320, "percentage": 80},
             {"name": "Entertainment", "budgeted": 200, "spent": 150, "percentage": 75},
-            {"name": "Shopping", "budgeted": 300, "spent": 380, "percentage": 127}
+            {"name": "Shopping", "budgeted": 300, "spent": 380, "percentage": 127},
         ],
         "recentTransactions": [
-            {"description": "Coffee Shop", "amount": -4.50, "date": "2025-10-11", "category": "Food & Dining"},
-            {"description": "Salary Deposit", "amount": 2500, "date": "2025-10-10", "category": "Income"},
-            {"description": "Gas Station", "amount": -45.00, "date": "2025-10-09", "category": "Transportation"},
-            {"description": "Online Purchase", "amount": -89.99, "date": "2025-10-08", "category": "Shopping"},
-            {"description": "Restaurant", "amount": -67.50, "date": "2025-10-07", "category": "Food & Dining"}
+            {
+                "description": "Coffee Shop",
+                "amount": -4.50,
+                "date": "2025-10-11",
+                "category": "Food & Dining",
+            },
+            {
+                "description": "Salary Deposit",
+                "amount": 2500,
+                "date": "2025-10-10",
+                "category": "Income",
+            },
+            {
+                "description": "Gas Station",
+                "amount": -45.00,
+                "date": "2025-10-09",
+                "category": "Transportation",
+            },
+            {
+                "description": "Online Purchase",
+                "amount": -89.99,
+                "date": "2025-10-08",
+                "category": "Shopping",
+            },
+            {
+                "description": "Restaurant",
+                "amount": -67.50,
+                "date": "2025-10-07",
+                "category": "Food & Dining",
+            },
         ],
         "goals": [
-            {"name": "Emergency Fund", "target": 10000, "current": 6500, "deadline": "2025-12-31"},
-            {"name": "Vacation Fund", "target": 3000, "current": 1200, "deadline": "2025-07-01"},
-            {"name": "New Car", "target": 25000, "current": 8500, "deadline": "2026-06-01"}
+            {
+                "name": "Emergency Fund",
+                "target": 10000,
+                "current": 6500,
+                "deadline": "2025-12-31",
+            },
+            {
+                "name": "Vacation Fund",
+                "target": 3000,
+                "current": 1200,
+                "deadline": "2025-07-01",
+            },
+            {
+                "name": "New Car",
+                "target": 25000,
+                "current": 8500,
+                "deadline": "2026-06-01",
+            },
         ],
         "insights": [
-            {"title": "Great Job!", "description": "You stayed under budget in 3 out of 4 categories this month.", "type": "success"},
-            {"title": "Shopping Alert", "description": "You've exceeded your shopping budget by 27%. Consider reducing discretionary purchases.", "type": "warning"},
-            {"title": "Savings Tip", "description": "Your emergency fund is 65% complete. You're on track to reach your goal by December.", "type": "tip"}
-        ]
+            {
+                "title": "Great Job!",
+                "description": "You stayed under budget in 3 out of 4 categories this month.",
+                "type": "success",
+            },
+            {
+                "title": "Shopping Alert",
+                "description": "You've exceeded your shopping budget by 27%. Consider reducing discretionary purchases.",
+                "type": "warning",
+            },
+            {
+                "title": "Savings Tip",
+                "description": "Your emergency fund is 65% complete. You're on track to reach your goal by December.",
+                "type": "tip",
+            },
+        ],
     }
 
 
@@ -229,16 +284,85 @@ async def complete_onboarding(request: OnboardingRequest):
         "next_steps": [
             "Set up your first budget",
             "Connect your bank account",
-            "Define your financial goals"
-        ]
+            "Define your financial goals",
+        ],
     }
+
+
+# ---------- User-specific data routes (demo/in-memory) ----------
+class Transaction(BaseModel):
+    description: str
+    amount: float
+    date: str
+    category: str
+
+
+class Goal(BaseModel):
+    name: str
+    target: float
+    current: float = 0
+    deadline: str | None = None
+
+
+class Budget(BaseModel):
+    category: str
+    budgeted: float
+    month: str  # YYYY-MM
+
+
+# In-memory user data stores for demo purposes (replace with DB in production)
+USER_TRANSACTIONS: Dict[str, list] = {}
+USER_GOALS: Dict[str, list] = {}
+USER_BUDGETS: Dict[str, list] = {}
+
+
+@app.get("/api/v1/transactions/{user_id}")
+async def get_transactions(user_id: str):
+    return USER_TRANSACTIONS.get(user_id, [])
+
+
+@app.post("/api/v1/transactions/{user_id}")
+async def add_transaction(user_id: str, tx: Transaction):
+    USER_TRANSACTIONS.setdefault(user_id, [])
+    USER_TRANSACTIONS[user_id].append(
+        {**tx.model_dump(), "id": len(USER_TRANSACTIONS[user_id]) + 1}
+    )
+    return {"message": "Transaction added", "count": len(USER_TRANSACTIONS[user_id])}
+
+
+@app.get("/api/v1/goals/{user_id}")
+async def get_goals(user_id: str):
+    return USER_GOALS.get(user_id, [])
+
+
+@app.post("/api/v1/goals/{user_id}")
+async def add_goal(user_id: str, goal: Goal):
+    USER_GOALS.setdefault(user_id, [])
+    USER_GOALS[user_id].append(
+        {**goal.model_dump(), "id": len(USER_GOALS[user_id]) + 1}
+    )
+    return {"message": "Goal added", "count": len(USER_GOALS[user_id])}
+
+
+@app.get("/api/v1/budgets/{user_id}")
+async def get_budgets(user_id: str):
+    return USER_BUDGETS.get(user_id, [])
+
+
+@app.post("/api/v1/budgets/{user_id}")
+async def add_budget(user_id: str, budget: Budget):
+    USER_BUDGETS.setdefault(user_id, [])
+    USER_BUDGETS[user_id].append(
+        {**budget.model_dump(), "id": len(USER_BUDGETS[user_id]) + 1}
+    )
+    return {"message": "Budget added", "count": len(USER_BUDGETS[user_id])}
 
 
 if __name__ == "__main__":
     # Check for Groq API key
     if not os.getenv("GROQ_API_KEY"):
         logger.warning("GROQ_API_KEY not found in environment variables")
-    
+
     uvicorn.run(
         "main:app",
         host="0.0.0.0",

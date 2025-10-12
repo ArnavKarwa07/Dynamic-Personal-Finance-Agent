@@ -3,8 +3,7 @@
  * Handles all communication with the backend API
  */
 
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api/v1";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api/v1";
 
 class FinanceAPIService {
   constructor() {
@@ -52,10 +51,11 @@ class FinanceAPIService {
 
   // Authentication endpoints
   async login(credentials) {
-    // Handle both email and username based login
+    // Backend expects email & password
     const loginData = {
       email: credentials.email || credentials.username,
       password: credentials.password,
+      name: credentials.name,
     };
 
     return this.apiCall("/auth/login", {
@@ -86,37 +86,69 @@ class FinanceAPIService {
   // Token verification
   async verifyToken(token) {
     this.setAuthToken(token);
-    // For demo purposes, return mock user data
+    // The backend exposes /api/v1/auth/verify
+    const resp = await this.apiCall("/auth/verify");
     return {
-      user: {
-        id: "demo_user_001",
-        email: "demo@example.com",
-        name: "Demo User",
-      },
-      userProfile: {
-        onboardingComplete: false,
-        financialGoals: [],
-      },
-      workflowStage: "initial",
+      user: resp.user,
+      userProfile: resp.userProfile || null,
+      workflowStage: resp.workflow_stage || resp.workflowStage,
     };
   }
 
   // Chat and workflow endpoints
-  async sendChatMessage(query, userId = null, conversationHistory = null) {
-    return this.apiCall("/chat", {
+  async sendChatMessage(
+    query,
+    userId = null,
+    conversationHistory = null,
+    workflow_stage = "Started"
+  ) {
+    // Backend chat expects: { message, context?, user_id, workflow_stage }
+    const res = await this.apiCall("/chat", {
       method: "POST",
       body: JSON.stringify({
-        query,
-        user_id: userId,
-        conversation_history: conversationHistory,
+        message: query,
+        user_id: userId || "default",
+        workflow_stage,
+        context: conversationHistory
+          ? { conversation_history: conversationHistory }
+          : undefined,
       }),
     });
+    return {
+      ...res,
+      stage: res.workflow_stage || res.stage,
+      suggestions: res.suggestions || [],
+      visualizations: res.visualizations || [],
+    };
+  }
+
+  // Backward-compat method used by some components
+  async chat(payload) {
+    // normalize payload to backend format
+    const { message, context, user_id, workflow_stage } = payload || {};
+    const res = await this.apiCall("/chat", {
+      method: "POST",
+      body: JSON.stringify({
+        message,
+        context,
+        user_id: user_id || "default",
+        workflow_stage: workflow_stage || "Started",
+      }),
+    });
+    return {
+      ...res,
+      stage: res.workflow_stage || res.stage,
+      suggestions: res.suggestions || [],
+      visualizations: res.visualizations || [],
+      workflowUpdate: res.workflowUpdate || null,
+    };
   }
 
   async completeOnboarding(onboardingData) {
+    // Backend expects { user_data: {...} }
     return this.apiCall("/onboarding", {
       method: "POST",
-      body: JSON.stringify(onboardingData),
+      body: JSON.stringify({ user_data: onboardingData }),
     });
   }
 
@@ -144,7 +176,52 @@ class FinanceAPIService {
 
   // User profile
   async getUserProfile(userId) {
-    return this.apiCall(`/profile/${userId}`);
+    // The backend currently doesn't expose a profile route in main.py.
+    // Keep function for future use; return a mock aligned with verify endpoint.
+    return {
+      user: { id: userId, name: "Demo User", email: "demo@example.com" },
+    };
+  }
+
+  // Dashboard data
+  async getDashboard(params = {}) {
+    const queryParams = new URLSearchParams(params).toString();
+    const endpoint = queryParams ? `/dashboard?${queryParams}` : "/dashboard";
+    return this.apiCall(endpoint);
+  }
+
+  // User-specific data
+  async getTransactions(userId) {
+    return this.apiCall(`/transactions/${userId}`);
+  }
+
+  async addTransaction(userId, tx) {
+    return this.apiCall(`/transactions/${userId}`, {
+      method: "POST",
+      body: JSON.stringify(tx),
+    });
+  }
+
+  async getGoals(userId) {
+    return this.apiCall(`/goals/${userId}`);
+  }
+
+  async addGoal(userId, goal) {
+    return this.apiCall(`/goals/${userId}`, {
+      method: "POST",
+      body: JSON.stringify(goal),
+    });
+  }
+
+  async getBudgets(userId) {
+    return this.apiCall(`/budgets/${userId}`);
+  }
+
+  async addBudget(userId, budget) {
+    return this.apiCall(`/budgets/${userId}`, {
+      method: "POST",
+      body: JSON.stringify(budget),
+    });
   }
 }
 

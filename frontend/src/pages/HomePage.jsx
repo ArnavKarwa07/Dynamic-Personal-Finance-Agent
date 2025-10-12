@@ -1,7 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@ui";
-import Footer from "@layout/Footer";
 
 export default function HomePage() {
   const features = [
@@ -33,50 +32,59 @@ export default function HomePage() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Hero Section */}
-      <section className="hero">
-        <div className="hero-content">
-          <div className="hero-text">
-            <h1>
+      <section className="relative overflow-hidden bg-white">
+        <div className="max-w-7xl mx-auto px-6 py-20 lg:flex lg:items-center lg:gap-12">
+          <div className="mx-auto max-w-2xl lg:mx-0">
+            <h1 className="text-4xl font-bold tracking-tight text-gray-900 sm:text-5xl">
               Take Control of Your{" "}
-              <span className="hero-highlight">Financial Future</span>
+              <span className="text-blue-600">Financial Future</span>
             </h1>
-
-            <p>
+            <p className="mt-6 text-lg leading-8 text-gray-600">
               Transform your financial life with our AI-powered personal finance
               agent. Get personalized insights, smart budgeting, and investment
               recommendations tailored just for you.
             </p>
-
-            <div className="hero-buttons">
-              <Link to="/login" className="btn btn-primary">
+            <div className="mt-10 flex items-center gap-x-6">
+              <Link
+                to="/login"
+                className="rounded-md bg-blue-600 px-6 py-3 text-sm font-semibold text-white shadow-sm hover:bg-blue-700"
+              >
                 Get Started Free →
               </Link>
-
-              <button className="btn btn-secondary">Watch Demo</button>
+              <button className="text-sm font-semibold leading-6 text-gray-900">
+                Watch Demo
+              </button>
             </div>
           </div>
         </div>
       </section>
 
       {/* Features Section */}
-      <section id="features" className="section-padding">
-        <div className="container mx-auto">
+      <section id="features" className="py-16">
+        <div className="max-w-7xl mx-auto px-6">
           <div className="text-center mb-12">
-            <h2 className="heading-2 text-gray-900 mb-6">
+            <h2 className="text-3xl font-bold tracking-tight text-gray-900">
               Powerful Features for Your Financial Success
             </h2>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
+            <p className="mt-4 text-lg text-gray-600 max-w-3xl mx-auto">
               Discover how our advanced AI technology and intuitive design can
-              help you achieve your financial goals faster than ever before.
+              help you achieve your goals faster.
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {features.map((feature, index) => (
-              <div key={index} className="feature-card animate-fade-in-up">
-                <div className="feature-icon">{feature.icon}</div>
-                <h3 className="feature-title">{feature.title}</h3>
-                <p className="feature-description">{feature.description}</p>
+              <div
+                key={index}
+                className="rounded-xl border bg-white p-6 shadow-sm"
+              >
+                <div className="text-3xl">{feature.icon}</div>
+                <h3 className="mt-4 text-lg font-semibold text-gray-900">
+                  {feature.title}
+                </h3>
+                <p className="mt-2 text-sm text-gray-600">
+                  {feature.description}
+                </p>
               </div>
             ))}
           </div>
@@ -84,41 +92,39 @@ export default function HomePage() {
       </section>
 
       {/* CTA Section */}
-      <section className="cta-section">
-        <div className="container mx-auto text-center relative z-10">
-          <h2 className="heading-2 text-white mb-6">
+      <section className="relative bg-gradient-to-r from-blue-600 to-purple-600 py-16">
+        <div className="max-w-7xl mx-auto px-6 text-center text-white">
+          <h2 className="text-3xl font-bold">
             Ready to Transform Your Financial Future?
           </h2>
-          <p className="text-xl text-blue-100 max-w-3xl mx-auto mb-10 leading-relaxed">
+          <p className="mt-4 text-blue-100 max-w-3xl mx-auto">
             Join thousands of users who have already taken control of their
             finances with our AI-powered platform.
           </p>
-
-          <div className="flex justify-center mb-10">
-            <Link to="/login" className="btn btn-primary btn-lg">
+          <div className="mt-8 flex justify-center">
+            <Link
+              to="/login"
+              className="rounded-md bg-white px-6 py-3 text-sm font-semibold text-blue-700 shadow-sm hover:bg-blue-50"
+            >
               Start Your Journey Today →
             </Link>
           </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-base">
+          <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="flex items-center justify-center gap-3">
-              <span className="text-green-400 text-xl">✓</span>
+              <span className="text-green-300 text-xl">✓</span>
               <span className="text-blue-100">Free to get started</span>
             </div>
             <div className="flex items-center justify-center gap-3">
-              <span className="text-green-400 text-xl">✓</span>
+              <span className="text-green-300 text-xl">✓</span>
               <span className="text-blue-100">No credit card required</span>
             </div>
             <div className="flex items-center justify-center gap-3">
-              <span className="text-green-400 text-xl">✓</span>
+              <span className="text-green-300 text-xl">✓</span>
               <span className="text-blue-100">Cancel anytime</span>
             </div>
           </div>
         </div>
       </section>
-
-      {/* Footer */}
-      <Footer />
     </div>
   );
 }

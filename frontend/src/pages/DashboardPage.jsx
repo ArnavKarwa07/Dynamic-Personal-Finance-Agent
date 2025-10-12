@@ -4,7 +4,6 @@
 import React from "react";
 import { useApp } from "@store/AppContext";
 import Dashboard from "@features/Dashboard";
-import ChatBot from "@features/ChatBot";
 
 const DashboardPage = () => {
   const { state } = useApp();
@@ -26,11 +25,10 @@ const DashboardPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="dashboard-container">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <Dashboard />
       </div>
-      <ChatBot />
     </div>
   );
 };
