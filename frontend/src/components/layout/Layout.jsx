@@ -7,15 +7,13 @@ import { useLocation } from "react-router-dom";
 import { useAppState, useAppActions } from "@store/AppContext";
 import Header from "./Header";
 import Footer from "./Footer";
-import FloatingAssistant from "@features/FloatingAssistant";
+import ChatBot from "@features/ChatBot";
 import LoginModal from "@components/features/LoginModal";
 import Toast from "@components/ui/Toast";
 import LoadingSpinner from "@components/ui/LoadingSpinner";
 
 const Layout = ({ children }) => {
   const { showLogin, isLoading, toast, error } = useAppState();
-  const location = useLocation();
-  const isAIPage = location.pathname === "/ai";
   const { clearError, clearToast } = useAppActions();
 
   return (
@@ -38,8 +36,8 @@ const Layout = ({ children }) => {
       {/* Footer */}
       <Footer />
 
-      {/* Floating Assistant (hidden on AI page to avoid duplicate chat) */}
-      {!isAIPage && <FloatingAssistant />}
+      {/* Simple ChatBot */}
+      <ChatBot />
 
       {/* Login Modal */}
       {showLogin && <LoginModal />}

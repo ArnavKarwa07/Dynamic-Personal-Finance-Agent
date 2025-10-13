@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import FinanceAPI from "../api/financeAPI";
 
 const AIInsights = ({ transactions = [], budget = null }) => {
   const [insights, setInsights] = useState([]);

@@ -15,8 +15,9 @@ import LoginPage from "@pages/LoginPage";
 import DashboardPage from "@pages/DashboardPage";
 import OnboardingPage from "@pages/OnboardingPage";
 import NotFoundPage from "@pages/NotFoundPage";
-import { financeAPI } from "@services/financeAPI";
+import { verifyTokenAPI } from "@api/finance";
 import AIPage from "@pages/AIPage";
+import TransactionsPage from "@pages/TransactionsPage";
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -41,7 +42,7 @@ const AppContent = () => {
         const token = localStorage.getItem("finance_token");
         if (token) {
           // Verify token and get user data
-          const userData = await financeAPI.verifyToken(token);
+          const userData = await verifyTokenAPI();
           dispatch({
             type: "SET_USER",
             payload: userData.user,
@@ -126,6 +127,15 @@ const AppContent = () => {
             element={
               <ProtectedRoute>
                 <AIPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/transactions"
+            element={
+              <ProtectedRoute>
+                <TransactionsPage />
               </ProtectedRoute>
             }
           />

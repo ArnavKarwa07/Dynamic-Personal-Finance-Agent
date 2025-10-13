@@ -3,8 +3,7 @@ from sqlalchemy.orm import Session
 from db.database import get_db
 from db import models as dbm
 from typing import Dict, Any
-from core.langgraph_workflow import finance_workflow, FinanceState
-from api.schemas import ChatRequest
+from core.langgraph_workflow import finance_workflow
 
 router = APIRouter()
 
@@ -68,61 +67,3 @@ async def get_example_queries(db: Session = Depends(get_db)):
     if not examples:
         examples.append("Help me get started with budgeting and goals")
     return {"examples": examples}
-
-@router.post("/workflow/run")
-async def run_workflow_on_demand(req: ChatRequest, db: Session = Depends(get_db)) -> Dict[str, Any]:
-    """Run the LangGraph workflow only when user asks. Returns explainable steps."""
-    try:
-        # Optional: load context from DB similar to chat
-        ctx = req.context or {}
-        uid = None
-        try:
-            if req.user_id and req.user_id != "default":
-                uid = int(req.user_id)
-        except Exception:
-            uid = None
-        if uid:
-            user = db.query(dbm.User).filter(dbm.User.id == uid).first()
-            if user:
-                tx = (
-                    db.query(dbm.Transaction)
-                    .filter(dbm.Transaction.user_id == uid)
-                    .order_by(dbm.Transaction.date.desc())
-                    .limit(25)
-                    .all()
-                )
-                ctx.update({
-                    "user": {"id": user.id, "email": user.email, "name": user.name},
-                    "transactions_count": len(tx),
-                })
-
-        state: FinanceState = {
-            "user_id": req.user_id,
-            "user_query": req.message,
-            "current_stage": req.workflow_stage.lower(),
-            "system_stage": req.workflow_stage.lower(),
-            "intent": "",
-            "context": ctx,
-            "response": "",
-            "analysis_results": {},
-            "next_action": "",
-            "tools_used": [],
-            "messages": [],
-            "consent_given": req.workflow_stage != "Started",
-            "profile_complete": req.workflow_stage in ["intermediate", "advanced"],
-            "execute_action": False,
-            "explanations": [],
-        }
-
-        result = await finance_workflow.run_async(state)
-        return {
-            "response": result.get("response", ""),
-            "intent": result.get("intent", ""),
-            "workflow_stage": result.get("current_stage", "started"),
-            "tools_used": result.get("tools_used", []),
-            "explanations": result.get("explanations", []),
-            "analysis_results": result.get("analysis_results", {}),
-            "next_action": result.get("next_action", ""),
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Workflow error: {e}")

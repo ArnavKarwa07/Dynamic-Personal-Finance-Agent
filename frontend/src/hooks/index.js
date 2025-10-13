@@ -2,7 +2,7 @@
  * Custom React hooks for the Finance Agent application
  */
 import { useState, useEffect, useCallback, useRef } from "react";
-import financeAPI from "@services/financeAPI";
+import { chatAPI, getWorkflowStatusAPI } from "@api/finance";
 
 // Hook for managing chat functionality
 export const useChat = (userId = null) => {
@@ -27,11 +27,7 @@ export const useChat = (userId = null) => {
       setMessages((prev) => [...prev, userMessage]);
 
       try {
-        const response = await financeAPI.sendChatMessage(
-          query,
-          userId,
-          messages
-        );
+        const response = await chatAPI({ message: query, user_id: userId });
 
         // Add AI response to chat
         const aiMessage = {
@@ -94,7 +90,7 @@ export const useWorkflowStatus = (userId) => {
     setError(null);
 
     try {
-      const statusData = await financeAPI.getWorkflowStatus(userId);
+      const statusData = await getWorkflowStatusAPI(userId);
       setStatus(statusData);
     } catch (err) {
       setError(err.message);

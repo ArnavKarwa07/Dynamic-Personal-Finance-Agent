@@ -81,21 +81,35 @@ async def register(request: RegisterRequest, db: Session = Depends(get_db)):
 @router.get("/verify")
 async def verify_token(authorization: Optional[str] = Header(default=None), db: Session = Depends(get_db)):
     try:
-        token = None
+        token: Optional[str] = None
         if authorization and authorization.lower().startswith("bearer "):
-            token = authorization.split(" ", 1)[1]
-        if token and token.startswith("token_"):
-            id_part = token.split("_", 1)[1]
+            token = authorization.split(" ", 1)[1].strip()
+
+        if not token:
+            raise HTTPException(status_code=401, detail="Missing token")
+
+        if not token.startswith("token_"):
+            raise HTTPException(status_code=401, detail="Invalid token format")
+
+        id_part = token.split("_", 1)[1]
+        try:
             uid = int(id_part)
-            user = db.query(dbm.User).filter(dbm.User.id == uid).first()
-            if user:
-                return {"user": {"id": user.id, "name": user.name, "email": user.email}, "workflow_stage": "Started"}
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
+        except Exception:
+            # Non-integer token id
+            raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+        user = db.query(dbm.User).filter(dbm.User.id == uid).first()
+        if not user:
+            raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+        return {"user": {"id": user.id, "name": user.name, "email": user.email}, "workflow_stage": "Started"}
     except HTTPException:
+        # Bubble up intended auth errors
         raise
     except Exception as e:
         logger.error(f"Verify error: {e}")
-        raise HTTPException(status_code=500, detail="Verification failed")
+        # Default to unauthorized on unexpected errors during verification
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
 
 
 @router.post("/logout")

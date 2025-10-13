@@ -3,8 +3,9 @@ from datetime import date, datetime, timedelta
 import hashlib
 from sqlalchemy.orm import Session
 from passlib.context import CryptContext
-from fastapi import HTTPException
+from fastapi import HTTPException, Depends, Header
 from db import models as dbm
+from db.database import SessionLocal
 
 # Password hashing
 pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
@@ -26,6 +27,39 @@ def get_user_or_404(db: Session, uid: int) -> dbm.User:
     user = db.query(dbm.User).filter(dbm.User.id == uid).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+    return user
+
+def get_db():
+    """Database dependency"""
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+def get_current_user(
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db)
+) -> dbm.User:
+    """Get current authenticated user - simplified for testing"""
+    # For testing purposes, create or get a default user
+    # In production, this would parse JWT tokens and validate authentication
+    
+    # Try to get user with ID 1, or create if doesn't exist
+    user = db.query(dbm.User).filter(dbm.User.id == 1).first()
+    
+    if not user:
+        # Create default test user
+        user = dbm.User(
+            id=1,
+            email="test@example.com",
+            name="Test User",
+            password_hash=hash_password("password123")
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+    
     return user
 
 # Date helpers for recurring

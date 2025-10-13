@@ -3,7 +3,8 @@
  */
 import React, { useState } from "react";
 import { useApp } from "@store/AppContext";
-import { financeAPI } from "@services/financeAPI";
+// Note: Onboarding API is not implemented on backend yet.
+// We keep local state and set workflow stage on completion.
 import Button from "@ui/Button";
 import Input from "@ui/Input";
 import LoadingSpinner from "@ui/LoadingSpinner";
@@ -73,20 +74,9 @@ const OnboardingPage = () => {
   const handleComplete = async () => {
     setIsLoading(true);
     try {
-      const response = await financeAPI.completeOnboarding(formData);
-
-      // Update user profile and workflow stage
-      dispatch({
-        type: "SET_USER_PROFILE",
-        payload: response.userProfile,
-      });
-
-      dispatch({
-        type: "SET_WORKFLOW_STAGE",
-        payload: "MVP",
-      });
-
-      // Redirect to dashboard
+      // In absence of a backend onboarding endpoint, just set local state
+      dispatch({ type: "SET_USER_PROFILE", payload: formData });
+      dispatch({ type: "SET_WORKFLOW_STAGE", payload: "MVP" });
       window.location.href = "/dashboard";
     } catch (error) {
       console.error("Onboarding completion error:", error);

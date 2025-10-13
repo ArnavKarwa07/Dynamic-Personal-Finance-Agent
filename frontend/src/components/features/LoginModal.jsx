@@ -3,7 +3,7 @@
  */
 import React, { useState } from "react";
 import { useApp } from "@store/AppContext";
-import { financeAPI } from "@services/financeAPI";
+import { loginAPI, registerAPI } from "@api/finance";
 import Modal from "@ui/Modal";
 import Button from "@ui/Button";
 import Input from "@ui/Input";
@@ -68,12 +68,12 @@ const LoginModal = ({ isOpen, onClose }) => {
       let response;
 
       if (isLogin) {
-        response = await financeAPI.login({
+        response = await loginAPI({
           email: formData.email,
           password: formData.password,
         });
       } else {
-        response = await financeAPI.register({
+        response = await registerAPI({
           name: formData.name,
           email: formData.email,
           password: formData.password,
@@ -120,7 +120,7 @@ const LoginModal = ({ isOpen, onClose }) => {
     setIsLoading(true);
     try {
       // Demo credentials
-      const response = await financeAPI.login({
+      const response = await loginAPI({
         email: "demo@example.com",
         password: "demo123",
       });

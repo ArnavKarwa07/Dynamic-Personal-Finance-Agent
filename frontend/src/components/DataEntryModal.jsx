@@ -1,5 +1,14 @@
 import React, { useState } from "react";
-import financeAPI from "@services/financeAPI";
+import {
+  addTransactionAPI,
+  updateTransactionAPI,
+  addGoalAPI,
+  updateGoalAPI,
+  addBudgetAPI,
+  updateBudgetAPI,
+  createRecurringAPI,
+  updateRecurringAPI,
+} from "@api/finance";
 
 const DataEntryModal = ({
   isOpen,
@@ -122,70 +131,70 @@ const DataEntryModal = ({
       if (type === "transaction") {
         const payload = {
           description: formData.description,
-          amount: parseFloat(formData.amount),
+          amount: (() => {
+            const val = parseFloat(formData.amount);
+            return isNaN(val) ? 0 : val;
+          })(),
           date: formData.date,
           category: formData.category,
         };
         if (mode === "edit" && initialItem?.id) {
-          response = await financeAPI.updateTransaction(
+          response = await updateTransactionAPI(
             userId,
             initialItem.id,
             payload
           );
         } else {
-          response = await financeAPI.addTransaction(userId, payload);
+          response = await addTransactionAPI(userId, payload);
         }
       } else if (type === "goal") {
+        const targetVal = parseFloat(formData.target_amount);
+        const currentVal = formData.current_amount
+          ? parseFloat(formData.current_amount)
+          : 0;
         const payload = {
           name: formData.name,
-          target: parseFloat(formData.target_amount),
-          current: formData.current_amount
-            ? parseFloat(formData.current_amount)
-            : 0,
+          target: isNaN(targetVal) ? 0 : targetVal,
+          current: isNaN(currentVal) ? 0 : currentVal,
           deadline: formData.target_date || null,
         };
         if (mode === "edit" && initialItem?.id) {
-          response = await financeAPI.updateGoal(
-            userId,
-            initialItem.id,
-            payload
-          );
+          response = await updateGoalAPI(userId, initialItem.id, payload);
         } else {
-          response = await financeAPI.addGoal(userId, payload);
+          response = await addGoalAPI(userId, payload);
         }
       } else if (type === "budget") {
+        const budgetedVal = parseFloat(formData.budgeted_amount);
         const payload = {
           category: formData.category,
-          budgeted: parseFloat(formData.budgeted_amount),
+          budgeted: isNaN(budgetedVal) ? 0 : budgetedVal,
           month: formData.month,
         };
         if (mode === "edit" && initialItem?.id) {
-          response = await financeAPI.updateBudget(
-            userId,
-            initialItem.id,
-            payload
-          );
+          response = await updateBudgetAPI(userId, initialItem.id, payload);
         } else {
-          response = await financeAPI.addBudget(userId, payload);
+          response = await addBudgetAPI(userId, payload);
         }
       } else if (type === "recurring") {
         const payload = {
           description: formData.description,
-          amount: parseFloat(formData.amount),
+          amount: (() => {
+            const val = parseFloat(formData.amount);
+            return isNaN(val) ? 0 : val;
+          })(),
           category: formData.category,
           start_date: formData.start_date,
           frequency: formData.frequency,
-          interval: parseInt(formData.interval || 1, 10),
+          interval: (() => {
+            const n = parseInt(formData.interval || 1, 10);
+            return isNaN(n) ? 1 : n;
+          })(),
           end_date: formData.end_date || null,
         };
         if (mode === "edit" && initialItem?.id) {
-          response = await financeAPI.updateRecurring(
-            userId,
-            initialItem.id,
-            payload
-          );
+          response = await updateRecurringAPI(userId, initialItem.id, payload);
         } else {
-          response = await financeAPI.createRecurring(userId, payload);
+          response = await createRecurringAPI(userId, payload);
         }
       } else {
         throw new Error(`Unsupported data type: ${type}`);
@@ -590,6 +599,57 @@ const DataEntryModal = ({
                   name="monthly_contribution"
                   value={formData.monthly_contribution}
                   onChange={handleInputChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-500"
+                />
+              </div>
+            </>
+          )}
+
+          {type === "budget" && (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Category
+                </label>
+                <select
+                  name="category"
+                  value={formData.category}
+                  onChange={handleInputChange}
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-500"
+                >
+                  <option value="">Select category</option>
+                  {categories.budget.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {cat}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Budgeted Amount
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  name="budgeted_amount"
+                  value={formData.budgeted_amount}
+                  onChange={handleInputChange}
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Month
+                </label>
+                <input
+                  type="month"
+                  name="month"
+                  value={formData.month}
+                  onChange={handleInputChange}
+                  required
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-500"
                 />
               </div>

@@ -1,18 +1,21 @@
-/**
- * Chat Bot Component
- */
-import React, { useState, useRef, useEffect } from "react";
-import { useApp } from "@store/AppContext";
-import { financeAPI } from "@services/financeAPI";
-import { cn } from "@utils";
+import { useState, useRef, useEffect } from "react";
+import { useChatAPI } from "../../api/apis";
+import "../../styles/ChatBot.css";
 
-const ChatBot = ({ className, variant = "floating" }) => {
-  const { state, dispatch } = useApp();
-  const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [isExpanded, setIsExpanded] = useState(false);
-  const [trace, setTrace] = useState([]);
+export default function ChatBot() {
+  const { sendMessage: sendChatMessage } = useChatAPI();
+  const [isOpen, setIsOpen] = useState(false);
+  const [messages, setMessages] = useState([
+    {
+      id: 1,
+      text: "Hi! I'm your Finance Assistant. How can I help you today?",
+      isBot: true,
+      timestamp: new Date(),
+      isHtml: false,
+    },
+  ]);
+  const [inputMessage, setInputMessage] = useState("");
+  const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = () => {
@@ -23,85 +26,92 @@ const ChatBot = ({ className, variant = "floating" }) => {
     scrollToBottom();
   }, [messages]);
 
-  const handleSendMessage = async () => {
-    if (!input.trim() || isLoading) return;
+  const sendMessage = async (e) => {
+    e.preventDefault();
+    if (!inputMessage.trim()) return;
 
     const userMessage = {
       id: Date.now(),
-      text: input,
-      sender: "user",
+      text: inputMessage,
+      isBot: false,
       timestamp: new Date(),
+      isHtml: false,
     };
+
     setMessages((prev) => [...prev, userMessage]);
-    setInput("");
-    setIsLoading(true);
+    const currentMessage = inputMessage;
+    setInputMessage("");
+    setIsTyping(true);
 
     try {
-      const response = await financeAPI.chat({
-        message: input,
-        user_id: state.user?.id,
-        context: {
-          currentWorkflowStage: state.workflowStage,
-          userProfile: state.userProfile,
-          recentTransactions: state.transactions?.slice(-5) || [],
-        },
-        workflow_stage: state.workflowStage || "Started",
-      });
+      const response = await sendChatMessage(currentMessage);
+
+      // Check if response contains HTML
+      const isHtmlResponse = response.includes("<") && response.includes(">");
 
       const botMessage = {
         id: Date.now() + 1,
-        text: response.response,
-        sender: "bot",
+        text: response,
+        isBot: true,
         timestamp: new Date(),
-        suggestions: response.suggestions || [],
-        workflowUpdate: response.workflowUpdate,
+        isHtml: isHtmlResponse,
       };
 
       setMessages((prev) => [...prev, botMessage]);
-      if (Array.isArray(response.explanations)) {
-        setTrace(response.explanations);
-      }
-
-      // Update workflow stage based on API stage or workflowUpdate
-      const stageFromApi = response.stage;
-      const stageFromUpdate = response.workflowUpdate?.newStage;
-      const nextStage = stageFromUpdate || stageFromApi;
-      if (nextStage) {
-        const canonical = (s) => {
-          const map = {
-            started: "Started",
-            mvp: "MVP",
-            intermediate: "Intermediate",
-            advanced: "Advanced",
-          };
-          const key = String(s).toLowerCase();
-          return map[key] || s;
-        };
-        dispatch({ type: "SET_WORKFLOW_STAGE", payload: canonical(nextStage) });
-      }
     } catch (error) {
+      console.error("Chat error:", error);
       const errorMessage = {
         id: Date.now() + 1,
-        text: "Sorry, I encountered an error. Please try again.",
-        sender: "bot",
+        text: "I'm experiencing technical difficulties. Please try again later.",
+        isBot: true,
         timestamp: new Date(),
-        isError: true,
+        isHtml: false,
       };
       setMessages((prev) => [...prev, errorMessage]);
     } finally {
-      setIsLoading(false);
+      setIsTyping(false);
     }
   };
 
-  const handleKeyPress = (e) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSendMessage();
-    }
-  };
+  // Send a specific text (used by quick actions) without relying on async state updates
+  const sendMessageText = async (text) => {
+    if (!text || !text.trim()) return;
 
-  const handleSuggestionClick = (suggestion) => {
-    setInput(suggestion);
+    const userMessage = {
+      id: Date.now(),
+      text,
+      isBot: false,
+      timestamp: new Date(),
+      isHtml: false,
+    };
+
+    setMessages((prev) => [...prev, userMessage]);
+    setIsTyping(true);
+
+    try {
+      const response = await sendChatMessage(text);
+      const isHtmlResponse = response.includes("<") && response.includes(">");
+      const botMessage = {
+        id: Date.now() + 1,
+        text: response,
+        isBot: true,
+        timestamp: new Date(),
+        isHtml: isHtmlResponse,
+      };
+      setMessages((prev) => [...prev, botMessage]);
+    } catch (error) {
+      console.error("Chat error:", error);
+      const errorMessage = {
+        id: Date.now() + 1,
+        text: "I'm experiencing technical difficulties. Please try again later.",
+        isBot: true,
+        timestamp: new Date(),
+        isHtml: false,
+      };
+      setMessages((prev) => [...prev, errorMessage]);
+    } finally {
+      setIsTyping(false);
+    }
   };
 
   const formatTime = (timestamp) => {
@@ -111,200 +121,140 @@ const ChatBot = ({ className, variant = "floating" }) => {
     });
   };
 
-  if (variant === "floating" && !isExpanded) {
-    return (
-      <div className={cn("fixed bottom-4 right-4 z-40", className)}>
-        <button
-          onClick={() => setIsExpanded(true)}
-          className="bg-blue-600 hover:bg-blue-700 text-white rounded-full p-4 shadow-lg transition-all duration-200 hover:scale-105"
-          aria-label="Open chat"
-        >
-          <svg
-            className="w-6 h-6"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
-            />
-          </svg>
-        </button>
-      </div>
-    );
-  }
-
-  const containerClasses =
-    variant === "floating"
-      ? "fixed bottom-4 right-4 z-40 w-96 h-[32rem]"
-      : "w-full h-[28rem]";
+  const quickActions = [
+    "How can I manage my budget?",
+    "Help me track transactions",
+    "Set up financial goals",
+  ];
 
   return (
-    <div
-      className={cn(
-        containerClasses + " bg-white rounded-lg shadow-xl border",
-        className
-      )}
-    >
-      {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b bg-blue-600 text-white rounded-t-lg">
-        <div className="flex items-center space-x-2">
-          <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
-            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-              <path
-                fillRule="evenodd"
-                d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z"
-                clipRule="evenodd"
-              />
-            </svg>
-          </div>
-          <div>
-            <h3 className="font-semibold">Finance Assistant</h3>
-            <p className="text-xs opacity-90">Stage: {state.workflowStage}</p>
-          </div>
-        </div>
-        {variant === "floating" && (
-          <button
-            onClick={() => setIsExpanded(false)}
-            className="text-white hover:text-gray-200 transition-colors"
-            aria-label="Close chat"
-          >
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
-          </button>
-        )}
-      </div>
+    <>
+      {/* Chat Toggle Button */}
+      <button
+        className={`chat-toggle ${isOpen ? "open" : ""}`}
+        onClick={() => setIsOpen(!isOpen)}
+        style={{
+          position: "fixed",
+          bottom: "80px",
+          right: "20px",
+          width: "60px",
+          height: "60px",
+          borderRadius: "50%",
+          background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+          color: "white",
+          border: "none",
+          cursor: "pointer",
+          fontSize: "24px",
+          boxShadow: "0 4px 12px rgba(102, 126, 234, 0.3)",
+          zIndex: 1000,
+          transition: "all 0.3s ease",
+        }}
+        onMouseEnter={(e) => {
+          e.target.style.transform = "scale(1.1)";
+          e.target.style.boxShadow = "0 6px 20px rgba(102, 126, 234, 0.4)";
+        }}
+        onMouseLeave={(e) => {
+          e.target.style.transform = "scale(1)";
+          e.target.style.boxShadow = "0 4px 12px rgba(102, 126, 234, 0.3)";
+        }}
+      >
+        {isOpen ? "✕" : "💬"}
+      </button>
 
-      {/* Messages */}
-      <div className="flex-1 p-4 h-80 overflow-y-auto space-y-4">
-        {messages.length === 0 ? (
-          <div className="text-center text-gray-500 mt-8 text-sm">
-            Ask anything about your finances to get started.
+      {/* Chat Window */}
+      {isOpen && (
+        <div className="chat-window">
+          <div className="chat-header">
+            <div className="chat-header-info">
+              <div className="ai-avatar">💰</div>
+              <div>
+                <h3>Finance Assistant</h3>
+                <p>Your Financial Helper</p>
+              </div>
+            </div>
+            <button className="close-chat" onClick={() => setIsOpen(false)}>
+              ✕
+            </button>
           </div>
-        ) : (
-          messages.map((message) => (
-            <div
-              key={message.id}
-              className={cn(
-                "flex",
-                message.sender === "user" ? "justify-end" : "justify-start"
-              )}
-            >
+
+          <div className="chat-messages">
+            {messages.map((message) => (
               <div
-                className={cn(
-                  "max-w-xs lg:max-w-md px-4 py-2 rounded-lg",
-                  message.sender === "user"
-                    ? "bg-blue-600 text-white"
-                    : message.isError
-                    ? "bg-red-50 text-red-800 border border-red-200"
-                    : "bg-gray-100 text-gray-800"
-                )}
+                key={message.id}
+                className={`message ${message.isBot ? "bot" : "user"}`}
+                style={{
+                  display: message.text || !message.isBot ? "" : "none",
+                }}
               >
-                <p className="text-sm">{message.text}</p>
-                {message.suggestions && message.suggestions.length > 0 && (
-                  <div className="mt-2 space-y-1">
-                    {message.suggestions.map((suggestion, index) => (
-                      <button
-                        key={index}
-                        onClick={() => handleSuggestionClick(suggestion)}
-                        className="block w-full text-left text-xs px-2 py-1 bg-white rounded border hover:bg-gray-50 transition-colors"
-                      >
-                        {suggestion}
-                      </button>
+                <div className="message-content">
+                  {message.text &&
+                    (message.isHtml ? (
+                      <div
+                        className="html-content"
+                        dangerouslySetInnerHTML={{ __html: message.text }}
+                      />
+                    ) : (
+                      <p>{message.text}</p>
                     ))}
+                  {!isTyping && message.text && (
+                    <span className="message-time">
+                      {formatTime(message.timestamp)}
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))}
+            {isTyping && (
+              <div className="message bot typing">
+                <div className="message-content">
+                  <div className="typing-indicator">
+                    <span></span>
+                    <span></span>
+                    <span></span>
                   </div>
-                )}
-                <p className="text-xs opacity-70 mt-1">
-                  {formatTime(message.timestamp)}
-                </p>
+                </div>
               </div>
-            </div>
-          ))
-        )}
-        {isLoading && (
-          <div className="flex justify-start">
-            <div className="bg-gray-100 text-gray-800 px-4 py-2 rounded-lg max-w-xs">
-              <div className="flex space-x-1">
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                <div
-                  className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                  style={{ animationDelay: "0.1s" }}
-                ></div>
-                <div
-                  className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                  style={{ animationDelay: "0.2s" }}
-                ></div>
-              </div>
-            </div>
-          </div>
-        )}
-        {/* Explainable AI trace */}
-        {trace.length > 0 && (
-          <div className="mt-4 space-y-2">
-            <h4 className="text-xs uppercase tracking-wide text-gray-500">
-              What the AI did
-            </h4>
-            <ol className="list-decimal ml-5 space-y-1">
-              {trace.map((t, i) => (
-                <li key={i} className="text-xs text-gray-700">
-                  <span className="font-medium">{t.step}:</span> {t.what}
-                </li>
-              ))}
-            </ol>
-          </div>
-        )}
-        <div ref={messagesEndRef} />
-      </div>
+            )}
 
-      {/* Input */}
-      <div className="p-4 border-t">
-        <div className="flex space-x-2">
-          <input
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyPress={handleKeyPress}
-            placeholder="Ask about your finances..."
-            className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-            disabled={isLoading}
-          />
-          <button
-            onClick={handleSendMessage}
-            disabled={!input.trim() || isLoading}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            <div ref={messagesEndRef} />
+          </div>
+
+          {/* Quick Actions */}
+          <div
+            className={`quick-actions ${
+              messages.length <= 1 ? "show" : "hide"
+            }`}
           >
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
-              />
-            </svg>
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
+            {quickActions.map((action, index) => (
+              <button
+                key={index}
+                className="quick-action"
+                onClick={() => sendMessageText(action)}
+              >
+                {action}
+              </button>
+            ))}
+          </div>
 
-export default ChatBot;
+          <form onSubmit={sendMessage} className="chat-input-form">
+            <input
+              type="text"
+              value={inputMessage}
+              onChange={(e) => setInputMessage(e.target.value)}
+              placeholder="Type your message..."
+              className="chat-input"
+              disabled={isTyping}
+            />
+            <button
+              type="submit"
+              className="send-button"
+              disabled={isTyping || !inputMessage.trim()}
+            >
+              ➤
+            </button>
+          </form>
+        </div>
+      )}
+    </>
+  );
+}

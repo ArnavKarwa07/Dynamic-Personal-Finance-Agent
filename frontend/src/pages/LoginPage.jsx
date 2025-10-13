@@ -5,7 +5,7 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useApp } from "@store/AppContext";
-import { financeAPI } from "@services/financeAPI";
+import { loginAPI, registerAPI } from "@api/finance";
 import Button from "@ui/Button";
 import Input from "@ui/Input";
 import Toast from "@ui/Toast";
@@ -71,12 +71,12 @@ const LoginPage = () => {
       let response;
 
       if (isLogin) {
-        response = await financeAPI.login({
+        response = await loginAPI({
           email: formData.email,
           password: formData.password,
         });
       } else {
-        response = await financeAPI.register({
+        response = await registerAPI({
           email: formData.email,
           password: formData.password,
           name: formData.name,
@@ -124,7 +124,7 @@ const LoginPage = () => {
     hideToast();
 
     try {
-      const response = await financeAPI.login({
+      const response = await loginAPI({
         email: "demo@example.com",
         password: "demo123",
       });

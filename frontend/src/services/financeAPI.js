@@ -1,55 +1,55 @@
 /**
  * API Service for Dynamic Personal Finance Agent
- * Handles all communication with the backend API
+ * Handles all communication with the backend API using Axios
  */
+
+import axios from "axios";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api/v1";
 
 class FinanceAPIService {
   constructor() {
-    this.baseURL = API_BASE_URL;
-    this.headers = {
-      "Content-Type": "application/json",
-    };
-    const t =
-      typeof window !== "undefined" &&
-      window.localStorage?.getItem("finance_token");
-    if (t) this.setAuthToken(t);
+    this.client = axios.create({
+      baseURL: API_BASE_URL,
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    // Set up request interceptor for auth token
+    this.client.interceptors.request.use((config) => {
+      const token =
+        typeof window !== "undefined" &&
+        window.localStorage?.getItem("finance_token");
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+      return config;
+    });
+
+    // Set up response interceptor for error handling
+    this.client.interceptors.response.use(
+      (response) => response.data,
+      (error) => {
+        console.error(`API call failed:`, error.response || error);
+        if (error.response?.data) {
+          throw new Error(
+            error.response.data.detail ||
+              error.response.data.message ||
+              `HTTP ${error.response.status}`
+          );
+        }
+        throw error;
+      }
+    );
   }
 
   // Set authentication token
   setAuthToken(token) {
     if (token) {
-      this.headers["Authorization"] = `Bearer ${token}`;
+      this.client.defaults.headers.Authorization = `Bearer ${token}`;
     } else {
-      delete this.headers["Authorization"];
-    }
-  }
-
-  // Generic API call method
-  async apiCall(endpoint, options = {}) {
-    const url = `${this.baseURL}${endpoint}`;
-    const config = {
-      headers: this.headers,
-      ...options,
-    };
-
-    try {
-      const response = await fetch(url, config);
-
-      if (!response.ok) {
-        const errorData = await response
-          .json()
-          .catch(() => ({ message: "API Error" }));
-        throw new Error(
-          errorData.detail || errorData.message || `HTTP ${response.status}`
-        );
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.error(`API call failed for ${endpoint}:`, error);
-      throw error;
+      delete this.client.defaults.headers.Authorization;
     }
   }
 
@@ -62,10 +62,7 @@ class FinanceAPIService {
       name: credentials.name,
     };
 
-    return this.apiCall("/auth/login", {
-      method: "POST",
-      body: JSON.stringify(loginData),
-    });
+    return this.client.post("/auth/login", loginData);
   }
 
   async register(userData) {
@@ -75,23 +72,18 @@ class FinanceAPIService {
       name: userData.name,
     };
 
-    return this.apiCall("/auth/register", {
-      method: "POST",
-      body: JSON.stringify(registerData),
-    });
+    return this.client.post("/auth/register", registerData);
   }
 
   async logout() {
-    return this.apiCall("/auth/logout", {
-      method: "POST",
-    });
+    return this.client.post("/auth/logout");
   }
 
   // Token verification
   async verifyToken(token) {
     this.setAuthToken(token);
     // The backend exposes /api/v1/auth/verify
-    const resp = await this.apiCall("/auth/verify");
+    const resp = await this.client.get("/auth/verify");
     return {
       user: resp.user,
       userProfile: resp.userProfile || null,
@@ -107,16 +99,13 @@ class FinanceAPIService {
     workflow_stage = "Started"
   ) {
     // Backend chat expects: { message, context?, user_id, workflow_stage }
-    const res = await this.apiCall("/chat", {
-      method: "POST",
-      body: JSON.stringify({
-        message: query,
-        user_id: userId || "default",
-        workflow_stage,
-        context: conversationHistory
-          ? { conversation_history: conversationHistory }
-          : undefined,
-      }),
+    const res = await this.client.post("/chat", {
+      message: query,
+      user_id: userId || "default",
+      workflow_stage,
+      context: conversationHistory
+        ? { conversation_history: conversationHistory }
+        : undefined,
     });
     return {
       ...res,
@@ -130,14 +119,11 @@ class FinanceAPIService {
   async chat(payload) {
     // normalize payload to backend format
     const { message, context, user_id, workflow_stage } = payload || {};
-    const res = await this.apiCall("/chat", {
-      method: "POST",
-      body: JSON.stringify({
-        message,
-        context,
-        user_id: user_id || "default",
-        workflow_stage: workflow_stage || "Started",
-      }),
+    const res = await this.client.post("/chat", {
+      message,
+      context,
+      user_id: user_id || "default",
+      workflow_stage: workflow_stage || "Started",
     });
     return {
       ...res,
@@ -148,46 +134,49 @@ class FinanceAPIService {
     };
   }
 
+  // Simple HTML-compatible chat
+  async chatHTML(payload) {
+    const { message, user_id, workflow_stage, context } = payload || {};
+    const res = await this.client.post("/chat/html", {
+      message,
+      user_id: user_id || "default",
+      workflow_stage: workflow_stage || "Started",
+      context,
+    });
+    // Always returns { response: string }
+    return res;
+  }
+
+  // Execute suggested action from AIPage
+  async executeAction(payload) {
+    return this.client.post("/chat/execute", payload);
+  }
+
   async completeOnboarding(onboardingData) {
     // Backend expects { user_data: {...} }
-    return this.apiCall("/onboarding", {
-      method: "POST",
-      body: JSON.stringify({ user_data: onboardingData }),
-    });
+    return this.client.post("/onboarding", { user_data: onboardingData });
   }
 
   async getWorkflowStatus(userId) {
-    return this.apiCall(`/workflow/status/${userId}`);
+    return this.client.get(`/workflow/status/${userId}`);
   }
 
   async getWorkflowVisualization() {
-    return this.apiCall("/workflow/visualization");
-  }
-
-  async runWorkflow({
-    message,
-    user_id,
-    workflow_stage = "Started",
-    context = null,
-  }) {
-    return this.apiCall("/workflow/run", {
-      method: "POST",
-      body: JSON.stringify({ message, user_id, workflow_stage, context }),
-    });
+    return this.client.get("/workflow/visualization");
   }
 
   // Tool and feature endpoints
   async getAvailableTools() {
-    return this.apiCall("/tools");
+    return this.client.get("/tools");
   }
 
   async getExampleQueries() {
-    return this.apiCall("/examples");
+    return this.client.get("/examples");
   }
 
   // Health check
   async healthCheck() {
-    return this.apiCall("/health");
+    return this.client.get("/health");
   }
 
   // User profile
@@ -201,129 +190,96 @@ class FinanceAPIService {
 
   // Dashboard data
   async getDashboard(params = {}) {
-    const queryParams = new URLSearchParams(params).toString();
-    const endpoint = queryParams ? `/dashboard?${queryParams}` : "/dashboard";
-    return this.apiCall(endpoint);
+    return this.client.get("/dashboard", { params });
   }
 
   // User-specific data
   async getTransactions(userId) {
-    return this.apiCall(`/transactions/${userId}`);
+    return this.client.get(`/transactions/${userId}`);
   }
 
   async addTransaction(userId, tx) {
-    return this.apiCall(`/transactions/${userId}`, {
-      method: "POST",
-      body: JSON.stringify(tx),
-    });
+    return this.client.post(`/transactions/${userId}`, tx);
   }
 
   async getTransaction(userId, id) {
-    return this.apiCall(`/transactions/${userId}/${id}`);
+    return this.client.get(`/transactions/${userId}/${id}`);
   }
 
   async updateTransaction(userId, id, tx) {
-    return this.apiCall(`/transactions/${userId}/${id}`, {
-      method: "PUT",
-      body: JSON.stringify(tx),
-    });
+    return this.client.put(`/transactions/${userId}/${id}`, tx);
   }
 
   async deleteTransaction(userId, id) {
-    return this.apiCall(`/transactions/${userId}/${id}`, {
-      method: "DELETE",
-    });
+    return this.client.delete(`/transactions/${userId}/${id}`);
   }
 
   async getGoals(userId) {
-    return this.apiCall(`/goals/${userId}`);
+    return this.client.get(`/goals/${userId}`);
   }
 
   async addGoal(userId, goal) {
-    return this.apiCall(`/goals/${userId}`, {
-      method: "POST",
-      body: JSON.stringify(goal),
-    });
+    return this.client.post(`/goals/${userId}`, goal);
   }
 
   async getGoal(userId, id) {
-    return this.apiCall(`/goals/${userId}/${id}`);
+    return this.client.get(`/goals/${userId}/${id}`);
   }
 
   async updateGoal(userId, id, goal) {
-    return this.apiCall(`/goals/${userId}/${id}`, {
-      method: "PUT",
-      body: JSON.stringify(goal),
-    });
+    return this.client.put(`/goals/${userId}/${id}`, goal);
   }
 
   async deleteGoal(userId, id) {
-    return this.apiCall(`/goals/${userId}/${id}`, {
-      method: "DELETE",
-    });
+    return this.client.delete(`/goals/${userId}/${id}`);
   }
 
   async getBudgets(userId) {
-    return this.apiCall(`/budgets/${userId}`);
+    return this.client.get(`/budgets/${userId}`);
   }
 
   async addBudget(userId, budget) {
-    return this.apiCall(`/budgets/${userId}`, {
-      method: "POST",
-      body: JSON.stringify(budget),
-    });
+    return this.client.post(`/budgets/${userId}`, budget);
   }
 
   async getBudget(userId, id) {
-    return this.apiCall(`/budgets/${userId}/${id}`);
+    return this.client.get(`/budgets/${userId}/${id}`);
   }
 
   async updateBudget(userId, id, budget) {
-    return this.apiCall(`/budgets/${userId}/${id}`, {
-      method: "PUT",
-      body: JSON.stringify(budget),
-    });
+    return this.client.put(`/budgets/${userId}/${id}`, budget);
   }
 
   async deleteBudget(userId, id) {
-    return this.apiCall(`/budgets/${userId}/${id}`, {
-      method: "DELETE",
-    });
+    return this.client.delete(`/budgets/${userId}/${id}`);
   }
 
   // Recurring transactions
   async listRecurring(userId) {
-    return this.apiCall(`/recurring/${userId}`);
+    return this.client.get(`/recurring/${userId}`);
   }
 
   async createRecurring(userId, item) {
-    return this.apiCall(`/recurring/${userId}`, {
-      method: "POST",
-      body: JSON.stringify(item),
-    });
+    return this.client.post(`/recurring/${userId}`, item);
   }
 
   async updateRecurring(userId, id, item) {
-    return this.apiCall(`/recurring/${userId}/${id}`, {
-      method: "PUT",
-      body: JSON.stringify(item),
-    });
+    return this.client.put(`/recurring/${userId}/${id}`, item);
   }
 
   async deleteRecurring(userId, id) {
-    return this.apiCall(`/recurring/${userId}/${id}`, {
-      method: "DELETE",
-    });
+    return this.client.delete(`/recurring/${userId}/${id}`);
   }
 
   async previewRecurring(userId, periods = 3) {
-    return this.apiCall(`/recurring/${userId}/preview?periods=${periods}`);
+    return this.client.get(`/recurring/${userId}/preview`, {
+      params: { periods },
+    });
   }
 
   async generateRecurring(userId, upTo = null) {
-    const qp = upTo ? `?up_to=${encodeURIComponent(upTo)}` : "";
-    return this.apiCall(`/recurring/${userId}/generate${qp}`, {
-      method: "POST",
+    return this.client.post(`/recurring/${userId}/generate`, null, {
+      params: upTo ? { up_to: upTo } : {},
     });
   }
 }
