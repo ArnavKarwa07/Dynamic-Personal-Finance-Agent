@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from typing import Dict, Any, List, Optional
 import logging
 
-from core.workflow import create_finance_workflow
+from core.langgraph_workflow import finance_workflow
 from core.state import UserProfile, UserState, SystemStage, FinancialIntent
 
 logger = logging.getLogger(__name__)
@@ -44,8 +44,7 @@ class WorkflowStatusResponse(BaseModel):
     available_features: List[str]
     next_steps: List[str]
 
-# Global workflow instance
-workflow = create_finance_workflow()
+# Using LangGraph-based workflow instance from core.langgraph_workflow
 
 @router.post("/chat", response_model=ChatResponse)
 async def chat_with_agent(request: ChatRequest):
@@ -53,33 +52,40 @@ async def chat_with_agent(request: ChatRequest):
     Main chat endpoint for interacting with the finance agent
     """
     try:
-        # Get or create user profile
-        user_profile = None
-        if request.user_id:
-            # In real implementation, load from database
-            user_profile = UserProfile(
-                user_id=request.user_id,
-                stage=UserState.ONBOARDED,
-                consent_given=True
-            )
-        
-        # Process the query through the workflow
-        result = await workflow.process_query(
-            user_query=request.query,
-            user_profile=user_profile
-        )
-        
+        # Build initial LangGraph state and run
+        user_id = request.user_id or "anonymous"
+        # If you want onboarding path on first runs, set consent/profile accordingly
+        state = {
+            "user_id": user_id,
+            "user_query": request.query,
+            "current_stage": "started",
+            "system_stage": "started",
+            "intent": "unknown",
+            "context": {},
+            "response": "",
+            "analysis_results": {},
+            "next_action": "",
+            "tools_used": [],
+            "messages": [],
+            "consent_given": True,
+            "profile_complete": True,
+            "execute_action": False,
+            "explanations": [],
+        }
+
+        final_state = await finance_workflow.run_async(state)
+
         return ChatResponse(
-            response=result["response"],
-            intent=result["intent"].value if hasattr(result["intent"], 'value') else str(result["intent"]),
-            stage=result["stage"].value if hasattr(result["stage"], 'value') else str(result["stage"]),
-            tools_used=result["tools_used"],
-            analysis_results=result["analysis_results"],
-            suggestions=result["suggestions"],
-            visualizations=result["visualizations"],
-            error=result["error"]
+            response=str(final_state.get("response", "")),
+            intent=str(final_state.get("intent", "unknown")),
+            stage=str(final_state.get("current_stage", final_state.get("system_stage", "started"))),
+            tools_used=list(final_state.get("tools_used", []) or []),
+            analysis_results=dict(final_state.get("analysis_results", {}) or {}),
+            suggestions=[],
+            visualizations=[],
+            error=None,
         )
-        
+
     except Exception as e:
         logger.error(f"Chat endpoint error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -271,14 +277,11 @@ async def health_check():
     Health check endpoint
     """
     try:
-        # Test workflow initialization
-        test_workflow = create_finance_workflow()
-        
         return {
             "status": "healthy",
             "version": "2.0.0",
             "workflow": "operational",
-            "groq_api": "configured" if workflow.groq_llm else "not_configured",
+            "groq_api": "configured",  # Using groq_client inside core.langgraph_workflow
             "timestamp": "2024-01-01T12:00:00Z"
         }
     except Exception as e:

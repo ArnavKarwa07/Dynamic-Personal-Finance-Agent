@@ -208,15 +208,14 @@ const Dashboard = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
+      <div>
+        
+      </div>
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">
             Financial Dashboard
           </h1>
-          <p className="text-gray-600">
-            Current stage:{" "}
-            <span className="font-medium">{state.workflowStage}</span>
-          </p>
         </div>
 
         <div className="flex space-x-2">
@@ -288,6 +287,9 @@ const Dashboard = () => {
                   No budget categories set up yet
                 </p>
               )}
+            </div>
+            <div>
+              
             </div>
           </div>
         )}

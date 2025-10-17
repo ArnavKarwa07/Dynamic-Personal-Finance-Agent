@@ -1,4 +1,11 @@
-# Python
+__pycache__/
+.vscode
+*.pyc
+.env
+*.egg-info/
+dist/
+build/
+/.venv/# Python
 __pycache__/
 *.py[cod]
 *$py.class

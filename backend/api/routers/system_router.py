@@ -114,12 +114,15 @@ async def get_dashboard(user_id: int, timeframe: str = "30d", db: Session = Depe
                 "category": b["name"],
             })
             # Suggest: increase this month's budget slightly or set next month's budget proactively
+            # Provide complete params so the execute API can succeed immediately
+            increased_amount = round(b["budgeted"] * 1.1, 2)
             suggestions.append({
                 "label": f"Increase {b['name']} budget by 10% for {month_key}",
                 "action": "update_budget",
                 "params": {
-                    # the UI will need the id; pick the matching budget row id if available
-                    # if multiple, pick first match
+                    "category": b["name"],
+                    "month": month_key,
+                    "budgeted": increased_amount,
                 },
                 "explain": "You overspent in this category; temporarily increasing budget can avoid constant overages while you adjust habits.",
             })

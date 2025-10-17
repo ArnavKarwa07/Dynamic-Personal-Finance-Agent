@@ -43,20 +43,37 @@ class ChatRequest(BaseModel):
 # --- Utility: simple category normalization and NLP-assisted action extraction ---
 
 CATEGORY_MAP = {
+    # Food related
     "dining": "Food & Dining",
     "food": "Food & Dining",
     "groceries": "Food & Dining",
     "grocery": "Food & Dining",
+    "coffee": "Food & Dining",
+    # Transportation
     "gas": "Transportation",
     "fuel": "Transportation",
     "uber": "Transportation",
     "lyft": "Transportation",
+    "car": "Transportation",
+    # Housing/Utilities
     "rent": "Housing",
+    "mortgage": "Housing",
     "electric": "Utilities",
     "electricity": "Utilities",
     "power": "Utilities",
     "water": "Utilities",
+    "internet": "Utilities",
+    # Entertainment and others
     "netflix": "Entertainment",
+    "entertainment": "Entertainment",
+    "shopping": "Shopping",
+    "utilities": "Utilities",
+    "transportation": "Transportation",
+    "housing": "Housing",
+    "savings": "Savings",
+    "health": "Health & Fitness",
+    "fitness": "Health & Fitness",
+    "health & fitness": "Health & Fitness",
 }
 
 def normalize_category(cat: Optional[str]) -> Optional[str]:
@@ -143,6 +160,9 @@ def extract_action_from_message(message: str) -> Optional[Dict[str, Any]]:
         if action == "update_budget":
             if params.get("category"):
                 params["category"] = normalize_category(params.get("category"))
+            # Default to current month if month not provided
+            if not params.get("month"):
+                params["month"] = datetime.now().strftime("%Y-%m")
         if action in ("add_goal", "update_goal"):
             # Normalize deadline
             if params.get("deadline") and len(params["deadline"]) == 7:
@@ -189,7 +209,12 @@ def run_action(db: Session, uid: int, action: str, params: Dict[str, Any]) -> Di
         if item_id:
             q = db.query(Budget).filter(Budget.user_id == uid, Budget.id == int(item_id))
         elif category and month:
-            q = db.query(Budget).filter(Budget.user_id == uid, Budget.category == category, Budget.month == month)
+            # Case-insensitive match on category to be user-friendly
+            q = db.query(Budget).filter(
+                Budget.user_id == uid,
+                func.lower(Budget.category) == (category or "").lower(),
+                Budget.month == month,
+            )
         else:
             raise HTTPException(status_code=400, detail="Provide id or (category, month)")
         row = q.first()

@@ -15,6 +15,7 @@ import LoginPage from "@pages/LoginPage";
 import DashboardPage from "@pages/DashboardPage";
 import OnboardingPage from "@pages/OnboardingPage";
 import NotFoundPage from "@pages/NotFoundPage";
+import WorkflowPage from "@pages/WorkflowPage";
 import { verifyTokenAPI } from "@api/finance";
 import AIPage from "@pages/AIPage";
 import TransactionsPage from "@pages/TransactionsPage";
@@ -127,6 +128,15 @@ const AppContent = () => {
             element={
               <ProtectedRoute>
                 <AIPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/workflow"
+            element={
+              <ProtectedRoute>
+                <WorkflowPage />
               </ProtectedRoute>
             }
           />

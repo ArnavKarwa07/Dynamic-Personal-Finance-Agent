@@ -163,6 +163,31 @@ class FinancialPlanningWorkflow:
         result = self.workflow.invoke(state)
         return result
 
+    async def stream_trace(self, state: FinanceState):
+        """Yield workflow execution events as an async generator.
+        Tries to use LangGraph astream_events; falls back to start/end only.
+        Yields dicts like {"event": str, "data": {...}} suitable for SSE.
+        """
+        # Preferred: use LangGraph event stream if available
+        try:
+            astream_events = getattr(self.workflow, "astream_events", None)
+            if astream_events is not None:
+                async for evt in astream_events(state, version="v2"):
+                    # evt is typically a dict with keys: 'event', 'data'
+                    yield {"event": evt.get("event"), "data": evt.get("data", {})}
+                return
+        except Exception as _e:
+            # Fall back to simple tracing
+            pass
+
+        # Fallback: emit start, then final state
+        yield {"event": "start", "data": {"message": "Workflow started"}}
+        try:
+            final = await self.run_async(state)
+            yield {"event": "end", "data": {"final_state": final}}
+        except Exception as e:
+            yield {"event": "error", "data": {"message": str(e)}}
+
     # Router functions
     def _route_by_stage(self, state: FinanceState) -> str:
         """Route based on current system stage"""
